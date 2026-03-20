@@ -95,7 +95,6 @@ async def status_page(request: Request):
 </div>
 </body>
 </html>"""
-    from starlette.responses import HTMLResponse
     return HTMLResponse(html)
 
 
@@ -179,7 +178,6 @@ h1{color:#1C3E63;font-size:22px;margin-bottom:12px}p{color:#555;font-size:15px;l
 </div>
 </body>
 </html>"""
-    from starlette.responses import HTMLResponse
     return HTMLResponse(html)
 
 
