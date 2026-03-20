@@ -83,14 +83,10 @@ async def status_page(request: Request):
     <strong>Dostupné tools:</strong> {tools_count}<br>
     <strong>Služby:</strong> Gmail, Google Drive, Google Sheets<br>
     <strong>Autentizace:</strong> OAuth 2.0 (Google)<br>
-    <strong>MCP endpoint:</strong> <code>/mcp</code>
+    <strong>Status:</strong> Running
   </div>
   <div class="footer">
-    Sensio.cz s.r.o. - MCP server pro AI asistenty<br>
-    <a href="/status/users" style="color:#999">Uživatelé</a> &middot;
-    <a href="https://github.com/Sensio-cz/mcp-google-workspace" style="color:#999">GitHub</a> &middot;
-    <a href="https://console.cloud.google.com/cloud-build/builds;region=europe-west1?project=mzdy-487615" style="color:#999">Cloud Build</a> &middot;
-    <a href="https://console.cloud.google.com/run/detail/europe-west1/mcp-google-workspace/revisions?project=mzdy-487615" style="color:#999">Cloud Run</a>
+    &copy; Sensio.cz s.r.o.
   </div>
 </div>
 </body>
