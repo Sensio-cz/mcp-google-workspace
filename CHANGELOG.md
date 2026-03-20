@@ -4,14 +4,20 @@ Všechny podstatné změny v projektu mcp-google-workspace.
 
 Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
 
-## [0.2.1] - 2026-03-20
+## [0.2.2] - 20. 3. 2026, 22:30
+
+### Přidáno
+- Logování: [AUTH] přihlášení uživatele (email), [TOOL] volání tools (email)
+- Logy viditelné v Cloud Run Logs Explorer
+
+## [0.2.1] - 20. 3. 2026, 22:15
 
 ### Přidáno
 - CHANGELOG.md, CLAUDE.md, PR šablona
 - Release status systém (alpha → beta → rc → stable)
 - Aktualizovaný README s kompletním seznamem tools
 
-## [0.2.0] - 2026-03-20
+## [0.2.0] - 20. 3. 2026, 19:30
 
 ### Přidáno
 - Multi-user OAuth autentizace (Google proxy pro claude.ai)
@@ -29,7 +35,7 @@ Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: 
 ### Odstraněno
 - `gmail_bulk_delete_messages` - mazal natrvalo, bezpečnostní riziko
 
-## [0.1.0] - 2026-03-20
+## [0.1.0] - 20. 3. 2026, 17:00
 
 ### Přidáno
 - Gmail tools: query, read, draft, reply, send, attachment
