@@ -4,6 +4,14 @@ Všechny podstatné změny v projektu mcp-google-workspace.
 
 Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
 
+## [0.2.6] - 20. 3. 2026, 23:30
+
+### Přidáno
+- `/status/users` - admin stránka se statistikami uživatelů (chráněno API klíčem)
+- Denní historie tool callů per uživatel
+- Tracking: počet tool callů, chyb, první/poslední přístup per uživatel
+- Persistované statistiky v `mcp-stats.json`
+
 ## [0.2.2] - 20. 3. 2026, 22:30
 
 ### Přidáno
