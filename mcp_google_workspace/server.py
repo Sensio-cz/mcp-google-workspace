@@ -80,8 +80,8 @@ async def status_page(request: Request):
   <h1>MCP Google Workspace</h1>
   <div class="info">
     <strong>Verze:</strong> {ver}<br>
-    <strong>Dostupne tools:</strong> {tools_count}<br>
-    <strong>Sluzby:</strong> Gmail, Google Drive, Google Sheets<br>
+    <strong>Dostupné tools:</strong> {tools_count}<br>
+    <strong>Služby:</strong> Gmail, Google Drive, Google Sheets<br>
     <strong>Autentizace:</strong> OAuth 2.0 (Google)<br>
     <strong>MCP endpoint:</strong> <code>/mcp</code>
   </div>
