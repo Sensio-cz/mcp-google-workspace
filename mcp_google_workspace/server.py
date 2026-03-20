@@ -44,6 +44,55 @@ mcp = FastMCP(
 )
 
 
+@mcp.custom_route("/", methods=["GET"])
+async def status_page(request: Request):
+    """Status stránka MCP serveru."""
+    from importlib.metadata import version as pkg_version
+    try:
+        ver = pkg_version("mcp-google-workspace")
+    except Exception:
+        ver = "dev"
+
+    tools_count = len(mcp._tool_manager._tools) if hasattr(mcp, '_tool_manager') else "?"
+
+    html = f"""<html>
+<head>
+<meta charset="utf-8">
+<title>Sensio MCP Google Workspace</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: 'Barlow', Arial, sans-serif; background: #f5f7fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; }}
+  .card {{ background: white; border-radius: 12px; padding: 48px; max-width: 500px; text-align: center; box-shadow: 0 4px 24px rgba(28,62,99,0.1); }}
+  .logo {{ color: #1C3E63; font-size: 28px; font-weight: 700; margin-bottom: 24px; }}
+  .logo span {{ color: #D67E29; }}
+  .status {{ display: inline-block; background: #C5DB33; color: white; padding: 4px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; margin-bottom: 24px; }}
+  h1 {{ color: #1C3E63; font-size: 20px; font-weight: 600; margin-bottom: 16px; }}
+  .info {{ color: #555; font-size: 14px; line-height: 1.8; text-align: left; }}
+  .info strong {{ color: #1C3E63; }}
+  .footer {{ margin-top: 24px; color: #999; font-size: 12px; }}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">sensio<span>.cz</span></div>
+  <div class="status">Online</div>
+  <h1>MCP Google Workspace</h1>
+  <div class="info">
+    <strong>Verze:</strong> {ver}<br>
+    <strong>Dostupne tools:</strong> {tools_count}<br>
+    <strong>Sluzby:</strong> Gmail, Google Drive, Google Sheets<br>
+    <strong>Autentizace:</strong> OAuth 2.0 (Google)<br>
+    <strong>MCP endpoint:</strong> <code>/mcp</code>
+  </div>
+  <div class="footer">Sensio.cz s.r.o. - MCP server pro AI asistenty</div>
+</div>
+</body>
+</html>"""
+    from starlette.responses import HTMLResponse
+    return HTMLResponse(html)
+
+
 @mcp.custom_route("/google/callback", methods=["GET"])
 async def google_callback(request: Request):
     """
