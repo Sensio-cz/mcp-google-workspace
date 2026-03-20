@@ -85,7 +85,12 @@ async def status_page(request: Request):
     <strong>Autentizace:</strong> OAuth 2.0 (Google)<br>
     <strong>MCP endpoint:</strong> <code>/mcp</code>
   </div>
-  <div class="footer">Sensio.cz s.r.o. - MCP server pro AI asistenty</div>
+  <div class="footer">
+    Sensio.cz s.r.o. - MCP server pro AI asistenty<br>
+    <a href="https://github.com/Sensio-cz/mcp-google-workspace" style="color:#999">GitHub</a> &middot;
+    <a href="https://console.cloud.google.com/cloud-build/builds;region=europe-west1?project=mzdy-487615" style="color:#999">Cloud Build</a> &middot;
+    <a href="https://console.cloud.google.com/run/detail/europe-west1/mcp-google-workspace/revisions?project=mzdy-487615" style="color:#999">Cloud Run</a>
+  </div>
 </div>
 </body>
 </html>"""
