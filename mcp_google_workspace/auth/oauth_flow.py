@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 import webbrowser
 
-from ..config import GOOGLE_CLIENT_ID
+from ..config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -39,13 +39,17 @@ def run_oauth_flow() -> dict:
 
             if "code" in params:
                 # Vymenit code za token pomoci PKCE (bez client_secret)
-                token_data = urllib.parse.urlencode({
+                token_params = {
                     "code": params["code"][0],
                     "client_id": GOOGLE_CLIENT_ID,
                     "redirect_uri": f"http://localhost:{self.server.server_address[1]}",
                     "grant_type": "authorization_code",
-                    "code_verifier": code_verifier,
-                }).encode()
+                }
+                if GOOGLE_CLIENT_SECRET:
+                    token_params["client_secret"] = GOOGLE_CLIENT_SECRET
+                else:
+                    token_params["code_verifier"] = code_verifier
+                token_data = urllib.parse.urlencode(token_params).encode()
 
                 req = urllib.request.Request(
                     "https://oauth2.googleapis.com/token",
@@ -62,8 +66,9 @@ def run_oauth_flow() -> dict:
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(
-                    "<html><body><h1>Prihlaseni uspesne!</h1>"
-                    "<p>Toto okno muzete zavrit.</p>"
+                    "<html><body>"
+                    "<h1>Přihlášení úspěšné!</h1>"
+                    "<p>Toto okno můžete zavřít a pokračovat v práci s Claude.</p>"
                     "<script>window.close()</script>"
                     "</body></html>".encode("utf-8")
                 )
@@ -84,18 +89,21 @@ def run_oauth_flow() -> dict:
     port = server.server_address[1]
     redirect_uri = f"http://localhost:{port}"
 
+    auth_params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(SCOPES),
+        "access_type": "offline",
+        "prompt": "consent",
+    }
+    if not GOOGLE_CLIENT_SECRET:
+        auth_params["code_challenge"] = code_challenge
+        auth_params["code_challenge_method"] = "S256"
+
     auth_url = (
         "https://accounts.google.com/o/oauth2/v2/auth?"
-        + urllib.parse.urlencode({
-            "client_id": GOOGLE_CLIENT_ID,
-            "redirect_uri": redirect_uri,
-            "response_type": "code",
-            "scope": " ".join(SCOPES),
-            "access_type": "offline",
-            "prompt": "consent",
-            "code_challenge": code_challenge,
-            "code_challenge_method": "S256",
-        })
+        + urllib.parse.urlencode(auth_params)
     )
 
     print("Otviram prohlizec pro prihlaseni ke Google uctu...")

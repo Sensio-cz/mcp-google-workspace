@@ -1,9 +1,10 @@
 import json
 import os
+import threading
 from pathlib import Path
 from google.oauth2.credentials import Credentials
 
-from ..config import CREDENTIALS_FILE, GOOGLE_CLIENT_ID
+from ..config import CREDENTIALS_FILE, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
 
 def load_credentials(creds_file: Path = CREDENTIALS_FILE) -> dict | None:
@@ -21,11 +22,44 @@ def save_credentials(creds_file: Path = CREDENTIALS_FILE, **kwargs) -> None:
         json.dump(kwargs, f, indent=2)
 
 
+# Background OAuth flow state
+_oauth_lock = threading.Lock()
+_oauth_result: dict | None = None
+_oauth_error: str | None = None
+_oauth_done = threading.Event()
+
+
+def _run_oauth_background():
+    """Spusti OAuth flow v background threadu."""
+    global _oauth_result, _oauth_error
+    try:
+        from .oauth_flow import run_oauth_flow
+        token_data = run_oauth_flow()
+        save_credentials(
+            refresh_token=token_data["refresh_token"],
+            client_id=GOOGLE_CLIENT_ID,
+            client_secret=GOOGLE_CLIENT_SECRET,
+        )
+        _oauth_result = token_data
+    except Exception as e:
+        _oauth_error = str(e)
+    finally:
+        _oauth_done.set()
+
+
+def _start_oauth_if_needed():
+    """Spusti OAuth flow na pozadi pokud jeste nebezi."""
+    with _oauth_lock:
+        if not _oauth_done.is_set() and not hasattr(_start_oauth_if_needed, "_started"):
+            _start_oauth_if_needed._started = True
+            t = threading.Thread(target=_run_oauth_background, daemon=True)
+            t.start()
+
+
 def get_google_credentials() -> Credentials:
     """Ziska Google credentials - z env, souboru, nebo spusti PKCE OAuth flow."""
     client_id = GOOGLE_CLIENT_ID
-    # client_secret pro zpetnou kompatibilitu s existujicimi tokeny
-    client_secret = os.environ.get("GOOGLE_WORKSPACE_CLIENT_SECRET", "")
+    client_secret = GOOGLE_CLIENT_SECRET
 
     # 1. Zkusit env promenne (zpetna kompatibilita)
     refresh_token = os.environ.get("GOOGLE_WORKSPACE_REFRESH_TOKEN")
@@ -46,20 +80,14 @@ def get_google_credentials() -> Credentials:
             refresh_token=saved["refresh_token"],
             token_uri="https://oauth2.googleapis.com/token",
             client_id=saved.get("client_id", client_id),
-            client_secret=saved.get("client_secret", ""),
+            client_secret=saved.get("client_secret", client_secret),
         )
 
-    # 3. Spustit PKCE OAuth flow - otevre prohlizec
-    from .oauth_flow import run_oauth_flow
-    token_data = run_oauth_flow()
-    save_credentials(
-        refresh_token=token_data["refresh_token"],
-        client_id=client_id,
-    )
-    return Credentials(
-        token=token_data.get("access_token"),
-        refresh_token=token_data["refresh_token"],
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=client_id,
-        client_secret="",
+    # 3. Na remote serveru - chyba (kazdy user se prihlasi pres OAuth connector)
+    if os.environ.get("MCP_TRANSPORT") == "streamable-http":
+        raise RuntimeError("Chybi Google credentials. Kazdy uzivatel se musi prihlasit pres OAuth.")
+
+    # 4. Lokalne - credentials chybi, uzivatel musi spustit setup
+    raise RuntimeError(
+        "Google credentials nenalezeny. Spustte v terminalu: mcp-google-workspace --setup"
     )

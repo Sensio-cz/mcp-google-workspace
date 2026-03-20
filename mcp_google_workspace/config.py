@@ -11,4 +11,7 @@ GOOGLE_CLIENT_ID = os.environ.get(
     "581084999054-tt8lg3fgp975ohh8abgvivo57tgupimp.apps.googleusercontent.com",
 )
 
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_WORKSPACE_CLIENT_SECRET", "")
+GOOGLE_CLIENT_SECRET = os.environ.get(
+    "GOOGLE_WORKSPACE_CLIENT_SECRET",
+    "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",
+)
