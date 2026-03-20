@@ -84,6 +84,14 @@ class TokenStore:
                 self._tokens[new_token] = google_data
                 self._save()
 
+    def get_user_email(self, mcp_access_token: str) -> str:
+        """Get user email for a given MCP access token."""
+        with self._lock:
+            google_data = self._tokens.get(mcp_access_token)
+        if not google_data:
+            return "unknown"
+        return google_data.get("user_email", "unknown")
+
     def get_google_credentials(self, mcp_access_token: str) -> Credentials | None:
         """Get Google credentials for a given MCP access token."""
         with self._lock:

@@ -151,6 +151,21 @@ async def google_callback(request: Request):
             status_code=400,
         )
 
+    # Zjistit email uživatele z Google tokenu
+    user_email = "unknown"
+    try:
+        async with httpx.AsyncClient() as client:
+            userinfo = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {google_tokens['access_token']}"},
+            )
+            if userinfo.status_code == 200:
+                user_email = userinfo.json().get("email", "unknown")
+    except Exception:
+        pass
+
+    logger.info(f"[AUTH] Nový uživatel přihlášen: {user_email}")
+
     # Create MCP auth code
     mcp_code = oauth_provider.create_auth_code_for_client(client_id, mcp_params)
 
@@ -160,6 +175,7 @@ async def google_callback(request: Request):
         "refresh_token": google_tokens["refresh_token"],
         "token_type": google_tokens.get("token_type", "Bearer"),
         "expires_in": google_tokens.get("expires_in"),
+        "user_email": user_email,
     })
 
     # Redirect back to claude.ai with the MCP auth code

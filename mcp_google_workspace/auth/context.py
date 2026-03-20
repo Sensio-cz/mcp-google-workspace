@@ -23,7 +23,8 @@ def get_current_google_credentials() -> Credentials:
     if access_token:
         creds = token_store.get_google_credentials(access_token.token)
         if creds:
-            logger.debug("Using per-user Google credentials")
+            user_email = token_store.get_user_email(access_token.token)
+            logger.info(f"[TOOL] Uživatel: {user_email}")
             return creds
         logger.warning(
             f"No Google token found for MCP token {access_token.token[:8]}..., "
