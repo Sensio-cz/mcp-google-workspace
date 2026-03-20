@@ -35,7 +35,11 @@ class TokenStore:
         self._lock = threading.Lock()
         # In-memory cache: mcp_access_token -> google_token_data
         self._tokens: dict[str, dict] = {}
+        # Usage stats: email -> {tool_calls, first_seen, last_seen, errors}
+        self._stats: dict[str, dict] = {}
+        self._stats_path = TOKEN_STORE_PATH.parent / "mcp-stats.json"
         self._load()
+        self._load_stats()
 
     def _load(self):
         if TOKEN_STORE_PATH.exists():
@@ -83,6 +87,83 @@ class TokenStore:
             if google_data:
                 self._tokens[new_token] = google_data
                 self._save()
+
+    def _load_stats(self):
+        if self._stats_path.exists():
+            try:
+                with open(self._stats_path) as f:
+                    self._stats = json.load(f)
+            except Exception:
+                self._stats = {}
+
+    def _save_stats(self):
+        try:
+            self._stats_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._stats_path, "w") as f:
+                json.dump(self._stats, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save stats: {e}")
+
+    def track_tool_call(self, email: str, tool_name: str = "", error: bool = False):
+        """Zaznamenej tool call pro statistiky."""
+        from datetime import datetime
+        now = datetime.now().strftime("%d. %m. %Y, %H:%M")
+        with self._lock:
+            if email not in self._stats:
+                self._stats[email] = {
+                    "tool_calls": 0,
+                    "errors": 0,
+                    "first_seen": now,
+                    "last_seen": now,
+                    "tools_used": {},
+                }
+            self._stats[email]["tool_calls"] += 1
+            self._stats[email]["last_seen"] = now
+            if error:
+                self._stats[email]["errors"] += 1
+            if tool_name:
+                tools = self._stats[email]["tools_used"]
+                tools[tool_name] = tools.get(tool_name, 0) + 1
+            self._save_stats()
+
+    def track_login(self, email: str):
+        """Zaznamenej přihlášení uživatele."""
+        from datetime import datetime
+        now = datetime.now().strftime("%d. %m. %Y, %H:%M")
+        with self._lock:
+            if email not in self._stats:
+                self._stats[email] = {
+                    "tool_calls": 0,
+                    "errors": 0,
+                    "first_seen": now,
+                    "last_seen": now,
+                    "tools_used": {},
+                }
+            self._stats[email]["last_login"] = now
+            self._save_stats()
+
+    def get_usage_stats(self) -> dict:
+        """Vrať statistiky pro status stránku."""
+        with self._lock:
+            total_users = len(self._stats)
+            total_calls = sum(s.get("tool_calls", 0) for s in self._stats.values())
+            total_errors = sum(s.get("errors", 0) for s in self._stats.values())
+            users = []
+            for email, s in self._stats.items():
+                users.append({
+                    "email": email,
+                    "tool_calls": s.get("tool_calls", 0),
+                    "errors": s.get("errors", 0),
+                    "first_seen": s.get("first_seen", "?"),
+                    "last_seen": s.get("last_seen", "?"),
+                    "last_login": s.get("last_login", "?"),
+                })
+            return {
+                "total_users": total_users,
+                "total_tool_calls": total_calls,
+                "total_errors": total_errors,
+                "users": users,
+            }
 
     def get_user_email(self, mcp_access_token: str) -> str:
         """Get user email for a given MCP access token."""

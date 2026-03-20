@@ -87,10 +87,71 @@ async def status_page(request: Request):
   </div>
   <div class="footer">
     Sensio.cz s.r.o. - MCP server pro AI asistenty<br>
+    <a href="/status/users" style="color:#999">Uživatelé</a> &middot;
     <a href="https://github.com/Sensio-cz/mcp-google-workspace" style="color:#999">GitHub</a> &middot;
     <a href="https://console.cloud.google.com/cloud-build/builds;region=europe-west1?project=mzdy-487615" style="color:#999">Cloud Build</a> &middot;
     <a href="https://console.cloud.google.com/run/detail/europe-west1/mcp-google-workspace/revisions?project=mzdy-487615" style="color:#999">Cloud Run</a>
   </div>
+</div>
+</body>
+</html>"""
+    from starlette.responses import HTMLResponse
+    return HTMLResponse(html)
+
+
+@mcp.custom_route("/status/users", methods=["GET"])
+async def status_users(request: Request):
+    """Statistiky uživatelů a tool callů."""
+    stats = token_store.get_usage_stats()
+
+    rows = ""
+    for u in stats["users"]:
+        rows += f"""<tr>
+            <td>{u['email']}</td>
+            <td>{u['tool_calls']}</td>
+            <td>{u['errors']}</td>
+            <td>{u['first_seen']}</td>
+            <td>{u['last_seen']}</td>
+            <td>{u.get('last_login', '-')}</td>
+        </tr>"""
+
+    html = f"""<html>
+<head>
+<meta charset="utf-8">
+<title>MCP Google Workspace - Uživatelé</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: 'Barlow', Arial, sans-serif; background: #f5f7fa; padding: 40px; }}
+  .card {{ background: white; border-radius: 12px; padding: 32px; max-width: 900px; margin: 0 auto; box-shadow: 0 4px 24px rgba(28,62,99,0.1); }}
+  .logo {{ color: #1C3E63; font-size: 24px; font-weight: 700; margin-bottom: 8px; }}
+  .logo span {{ color: #D67E29; }}
+  h1 {{ color: #1C3E63; font-size: 20px; margin-bottom: 24px; }}
+  .summary {{ display: flex; gap: 24px; margin-bottom: 24px; }}
+  .stat {{ background: #f5f7fa; border-radius: 8px; padding: 16px 24px; text-align: center; }}
+  .stat .num {{ font-size: 28px; font-weight: 700; color: #1C3E63; }}
+  .stat .label {{ font-size: 13px; color: #777; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
+  th {{ background: #1C3E63; color: white; padding: 10px 12px; text-align: left; }}
+  td {{ padding: 10px 12px; border-bottom: 1px solid #eee; }}
+  tr:hover {{ background: #f9f9f9; }}
+  .back {{ margin-top: 16px; display: inline-block; color: #D67E29; text-decoration: none; font-size: 13px; }}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">sensio<span>.cz</span></div>
+  <h1>MCP Google Workspace - Uživatelé</h1>
+  <div class="summary">
+    <div class="stat"><div class="num">{stats['total_users']}</div><div class="label">Uživatelů</div></div>
+    <div class="stat"><div class="num">{stats['total_tool_calls']}</div><div class="label">Tool callů</div></div>
+    <div class="stat"><div class="num">{stats['total_errors']}</div><div class="label">Chyb</div></div>
+  </div>
+  <table>
+    <tr><th>Email</th><th>Tool callů</th><th>Chyb</th><th>První přístup</th><th>Poslední aktivita</th><th>Poslední přihlášení</th></tr>
+    {rows if rows else '<tr><td colspan="6" style="text-align:center;color:#999">Zatím žádní uživatelé</td></tr>'}
+  </table>
+  <a href="/" class="back">← Zpět na status</a>
 </div>
 </body>
 </html>"""
@@ -165,6 +226,7 @@ async def google_callback(request: Request):
         pass
 
     logger.info(f"[AUTH] Nový uživatel přihlášen: {user_email}")
+    token_store.track_login(user_email)
 
     # Create MCP auth code
     mcp_code = oauth_provider.create_auth_code_for_client(client_id, mcp_params)

@@ -25,6 +25,7 @@ def get_current_google_credentials() -> Credentials:
         if creds:
             user_email = token_store.get_user_email(access_token.token)
             logger.info(f"[TOOL] Uživatel: {user_email}")
+            token_store.track_tool_call(user_email)
             return creds
         logger.warning(
             f"No Google token found for MCP token {access_token.token[:8]}..., "
