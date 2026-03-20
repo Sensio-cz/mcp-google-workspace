@@ -1,6 +1,7 @@
 """
-In-memory OAuth provider for PoC testing with claude.ai custom connectors.
-Implements OAuthAuthorizationServerProvider protocol from MCP SDK.
+OAuth provider that proxies Google OAuth for multi-user authentication.
+When claude.ai calls /authorize, the user is redirected to Google OAuth.
+After Google login, the Google token is stored and mapped to the MCP token.
 """
 
 import secrets
@@ -19,6 +20,8 @@ from mcp.server.auth.provider import (
     construct_redirect_uri,
 )
 
+from .token_store import token_store, GOOGLE_SCOPES
+
 logger = logging.getLogger(__name__)
 
 # Token validity
@@ -26,23 +29,26 @@ ACCESS_TOKEN_TTL = 3600  # 1 hour
 REFRESH_TOKEN_TTL = 86400 * 30  # 30 days
 AUTH_CODE_TTL = 300  # 5 minutes
 
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 
-class InMemoryOAuthProvider:
+
+class GoogleProxyOAuthProvider:
     """
-    Minimal in-memory OAuth provider for PoC.
-    Accepts any client via dynamic registration.
-    Issues tokens mapped to a test user.
+    OAuth provider that redirects to Google OAuth during authorization.
+    Maps MCP tokens to per-user Google tokens.
     """
 
-    def __init__(self, server_url: str):
+    def __init__(self, server_url: str, google_client_id: str, google_client_secret: str):
         self.server_url = server_url.rstrip("/")
+        self.google_client_id = google_client_id
+        self.google_client_secret = google_client_secret
         # In-memory stores
         self._clients: dict[str, OAuthClientInformationFull] = {}
         self._auth_codes: dict[str, AuthorizationCode] = {}
         self._access_tokens: dict[str, AccessToken] = {}
         self._refresh_tokens: dict[str, RefreshToken] = {}
-        # Map auth code -> pending params (for the consent page flow)
-        self._pending_authorizations: dict[str, dict] = {}
+        # Pending Google OAuth states: google_state -> {client, params}
+        self._pending_google_auth: dict[str, dict] = {}
 
     # --- Client Registration ---
 
@@ -56,17 +62,53 @@ class InMemoryOAuthProvider:
         self._clients[client_info.client_id] = client_info
         logger.info(f"Registered client: {client_info.client_id}")
 
-    # --- Authorization ---
+    # --- Authorization (redirects to Google) ---
 
     async def authorize(
         self, client: OAuthClientInformationFull, params: AuthorizationParams
     ) -> str:
         """
-        Returns URL to a consent page. For this PoC we auto-approve and redirect
-        back with an auth code immediately (no HTML form needed since we want
-        minimal friction for testing).
+        Instead of auto-approving, redirect user to Google OAuth.
+        After Google login, /google/callback completes the MCP flow.
         """
-        # Generate authorization code
+        # Generate a state token to link Google callback back to this MCP auth request
+        google_state = secrets.token_urlsafe(32)
+
+        # Store the pending MCP authorization params
+        self._pending_google_auth[google_state] = {
+            "client_id": client.client_id,
+            "params": params,
+            "created_at": time.time(),
+        }
+
+        # Build Google OAuth URL
+        google_redirect_uri = f"{self.server_url}/google/callback"
+        google_params = {
+            "client_id": self.google_client_id,
+            "redirect_uri": google_redirect_uri,
+            "response_type": "code",
+            "scope": " ".join(GOOGLE_SCOPES),
+            "access_type": "offline",
+            "prompt": "consent",
+            "state": google_state,
+        }
+
+        google_url = f"{GOOGLE_AUTH_URL}?{urlencode(google_params)}"
+        logger.info(f"Redirecting to Google OAuth for client {client.client_id}")
+        return google_url
+
+    def get_pending_auth(self, google_state: str) -> dict | None:
+        """Retrieve and remove a pending Google auth by state."""
+        pending = self._pending_google_auth.pop(google_state, None)
+        if pending and time.time() - pending["created_at"] > AUTH_CODE_TTL:
+            logger.warning("Pending Google auth expired")
+            return None
+        return pending
+
+    def create_auth_code_for_client(
+        self, client_id: str, params: AuthorizationParams
+    ) -> str:
+        """Create an MCP auth code after Google OAuth succeeds. Returns the code string."""
         code = secrets.token_urlsafe(32)
         now = time.time()
 
@@ -74,22 +116,15 @@ class InMemoryOAuthProvider:
             code=code,
             scopes=params.scopes or [],
             expires_at=now + AUTH_CODE_TTL,
-            client_id=client.client_id,
+            client_id=client_id,
             code_challenge=params.code_challenge,
             redirect_uri=params.redirect_uri,
             redirect_uri_provided_explicitly=params.redirect_uri_provided_explicitly,
             resource=params.resource,
         )
         self._auth_codes[code] = auth_code
-        logger.info(f"Issued auth code for client {client.client_id}")
-
-        # Build redirect back to the client with the code
-        redirect_url = construct_redirect_uri(
-            str(params.redirect_uri),
-            code=code,
-            state=params.state,
-        )
-        return redirect_url
+        logger.info(f"Issued MCP auth code for client {client_id} after Google OAuth")
+        return code
 
     # --- Authorization Code ---
 
@@ -135,6 +170,9 @@ class InMemoryOAuthProvider:
         )
         self._refresh_tokens[refresh_token_str] = refresh_token
 
+        # Promote the Google token mapping from auth code to access token
+        token_store.promote_auth_code_to_access_token(authorization_code.code, access_token_str)
+
         logger.info(f"Exchanged auth code for tokens, client={client.client_id}")
 
         return OAuthToken(
@@ -172,6 +210,13 @@ class InMemoryOAuthProvider:
         now = int(time.time())
         use_scopes = scopes or refresh_token.scopes
 
+        # Find old access token to migrate Google token mapping
+        old_access_token = None
+        for token_str, at in self._access_tokens.items():
+            if at.client_id == client.client_id:
+                old_access_token = token_str
+                break
+
         # New access token
         access_token_str = secrets.token_urlsafe(32)
         access_token = AccessToken(
@@ -181,6 +226,11 @@ class InMemoryOAuthProvider:
             expires_at=now + ACCESS_TOKEN_TTL,
         )
         self._access_tokens[access_token_str] = access_token
+
+        # Migrate Google token mapping
+        if old_access_token:
+            self._access_tokens.pop(old_access_token, None)
+            token_store.promote_access_token(old_access_token, access_token_str)
 
         # New refresh token
         new_refresh_str = secrets.token_urlsafe(32)

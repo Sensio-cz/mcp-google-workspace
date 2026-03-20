@@ -7,21 +7,20 @@ from typing import Any
 
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from googleapiclient.discovery import build
-from ..auth.credentials import get_google_credentials
+from ..auth.context import get_current_google_credentials
 
 logger = logging.getLogger(__name__)
 
 
 class DriveService:
     def __init__(self):
-        self._service = None
+        pass
 
     @property
     def service(self):
-        if self._service is None:
-            creds = get_google_credentials()
-            self._service = build("drive", "v3", credentials=creds)
-        return self._service
+        """Build a Drive service using the current user's credentials (per-request)."""
+        creds = get_current_google_credentials()
+        return build("drive", "v3", credentials=creds)
 
     def search_files(self, query: str, page_size: int = 10, shared_drive_id: str | None = None) -> list[dict]:
         page_size = max(1, min(page_size, 1000))

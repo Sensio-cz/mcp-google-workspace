@@ -4,20 +4,18 @@ from email.utils import parseaddr, formataddr
 from email.header import Header
 from typing import Any
 from googleapiclient.discovery import build
-from ..auth.credentials import get_google_credentials
+from ..auth.context import get_current_google_credentials
 
 
 class GmailService:
     def __init__(self):
-        self._service = None
         self._signature_cache: dict[str, str] = {}
 
     @property
     def service(self):
-        if self._service is None:
-            creds = get_google_credentials()
-            self._service = build("gmail", "v1", credentials=creds)
-        return self._service
+        """Build a Gmail service using the current user's credentials (per-request)."""
+        creds = get_current_google_credentials()
+        return build("gmail", "v1", credentials=creds)
 
     # --- Podpis ---
 
