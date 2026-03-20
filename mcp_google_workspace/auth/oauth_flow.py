@@ -66,18 +66,65 @@ def run_oauth_flow() -> dict:
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(
-                    "<html><body>"
-                    "<h1>Přihlášení úspěšné!</h1>"
-                    "<p>Toto okno můžete zavřít a pokračovat v práci s Claude.</p>"
-                    "<script>window.close()</script>"
-                    "</body></html>".encode("utf-8")
+                    """<html>
+<head>
+<meta charset="utf-8">
+<title>Sensio MCP - Přihlášení</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Barlow', Arial, sans-serif; background: #f5f7fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .card { background: white; border-radius: 12px; padding: 48px; max-width: 440px; text-align: center; box-shadow: 0 4px 24px rgba(28,62,99,0.1); }
+  .logo { color: #1C3E63; font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .logo span { color: #D67E29; }
+  .check { width: 64px; height: 64px; background: #C5DB33; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 24px auto; }
+  .check svg { width: 32px; height: 32px; stroke: white; stroke-width: 3; fill: none; }
+  h1 { color: #1C3E63; font-size: 22px; font-weight: 600; margin-bottom: 12px; }
+  p { color: #555; font-size: 15px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">sensio<span>.cz</span></div>
+  <div class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+  <h1>Přihlášení úspěšné!</h1>
+  <p>Toto okno můžete zavřít a pokračovat v práci s Claude.</p>
+</div>
+<script>setTimeout(function(){window.close()},3000)</script>
+</body>
+</html>""".encode("utf-8")
                 )
             elif "error" in params:
                 self.send_response(400)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
                 error = params.get("error", ["unknown"])[0]
-                self.wfile.write(f"<h1>Chyba: {error}</h1>".encode("utf-8"))
+                self.wfile.write(f"""<html>
+<head>
+<meta charset="utf-8">
+<title>Sensio MCP - Chyba</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: 'Barlow', Arial, sans-serif; background: #f5f7fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; }}
+  .card {{ background: white; border-radius: 12px; padding: 48px; max-width: 440px; text-align: center; box-shadow: 0 4px 24px rgba(28,62,99,0.1); }}
+  .logo {{ color: #1C3E63; font-size: 28px; font-weight: 700; margin-bottom: 8px; }}
+  .logo span {{ color: #D67E29; }}
+  .icon {{ width: 64px; height: 64px; background: #D67E29; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 24px auto; }}
+  .icon svg {{ width: 32px; height: 32px; stroke: white; stroke-width: 3; fill: none; }}
+  h1 {{ color: #1C3E63; font-size: 22px; font-weight: 600; margin-bottom: 12px; }}
+  p {{ color: #555; font-size: 15px; line-height: 1.5; }}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">sensio<span>.cz</span></div>
+  <div class="icon"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+  <h1>Přihlášení se nezdařilo</h1>
+  <p>Chyba: {error}<br>Zkuste to prosím znovu.</p>
+</div>
+</body>
+</html>""".encode("utf-8")
             else:
                 self.send_response(400)
                 self.end_headers()
