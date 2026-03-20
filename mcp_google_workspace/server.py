@@ -170,6 +170,14 @@ h1{color:#1C3E63;font-size:22px;margin-bottom:12px}p{color:#555;font-size:15px;l
         for day, d in sorted(u.get("daily", {}).items(), reverse=True)
     ) or '<tr><td colspan="4" style="text-align:center;color:#999">Zatím žádná data</td></tr>'}
   </table>
+  <h2 style="color:#1C3E63;font-size:16px;margin:24px 0 12px">Admin odkazy</h2>
+  <div style="display:flex;gap:16px;flex-wrap:wrap">
+    <a href="https://github.com/Sensio-cz/mcp-google-workspace" style="color:#D67E29;text-decoration:none;padding:8px 16px;border:1px solid #D67E29;border-radius:6px;font-size:13px">GitHub</a>
+    <a href="https://console.cloud.google.com/cloud-build/builds;region=europe-west1?project=mzdy-487615" style="color:#D67E29;text-decoration:none;padding:8px 16px;border:1px solid #D67E29;border-radius:6px;font-size:13px">Cloud Build</a>
+    <a href="https://console.cloud.google.com/run/detail/europe-west1/mcp-google-workspace/revisions?project=mzdy-487615" style="color:#D67E29;text-decoration:none;padding:8px 16px;border:1px solid #D67E29;border-radius:6px;font-size:13px">Cloud Run</a>
+    <a href="https://console.cloud.google.com/logs/query?project=mzdy-487615" style="color:#D67E29;text-decoration:none;padding:8px 16px;border:1px solid #D67E29;border-radius:6px;font-size:13px">Logs</a>
+    <a href="https://console.cloud.google.com/apis/credentials?project=mzdy-487615" style="color:#D67E29;text-decoration:none;padding:8px 16px;border:1px solid #D67E29;border-radius:6px;font-size:13px">OAuth Credentials</a>
+  </div>
   <a href="/" class="back">← Zpět na status</a>
 </div>
 </body>
