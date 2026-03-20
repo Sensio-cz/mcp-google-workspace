@@ -1,3 +1,4 @@
+import os
 import asyncio
 from .server import mcp
 
@@ -6,7 +7,8 @@ from .tools import gmail, drive, sheets  # noqa: F401
 
 
 def main():
-    asyncio.run(mcp.run())
+    transport = os.environ.get("MCP_TRANSPORT", "stdio")
+    mcp.run(transport=transport)
 
 
 if __name__ == "__main__":
