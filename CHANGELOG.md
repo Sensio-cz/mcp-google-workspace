@@ -1,0 +1,41 @@
+# Changelog
+
+Všechny podstatné změny v projektu mcp-google-workspace.
+
+Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
+
+## [0.2.1] - 2026-03-20
+
+### Přidáno
+- CHANGELOG.md, CLAUDE.md, PR šablona
+- Release status systém (alpha → beta → rc → stable)
+- Aktualizovaný README s kompletním seznamem tools
+
+## [0.2.0] - 2026-03-20
+
+### Přidáno
+- Multi-user OAuth autentizace (Google proxy pro claude.ai)
+- Cloud Run deployment s auto-build z GitHubu
+- Gmail tools: `gmail_mark_as_read`, `gmail_mark_as_unread`, `gmail_archive`, `gmail_star`, `gmail_unstar`, `gmail_add_label`, `gmail_remove_label`, `gmail_trash`
+- Status stránka na root URL (verze, počet tools, odkazy)
+- Lokální auto OAuth flow (otevře prohlížeč při prvním použití)
+- GDPR pravidlo v SOUL.md (Sensio OS)
+- OAuth success stránka v Sensio vizuálu
+
+### Opraveno
+- Reply bug: diakritika v To header (lowercase "to" vs "To")
+- Automatický Gmail podpis v draftech
+
+### Odstraněno
+- `gmail_bulk_delete_messages` - mazal natrvalo, bezpečnostní riziko
+
+## [0.1.0] - 2026-03-20
+
+### Přidáno
+- Gmail tools: query, read, draft, reply, send, attachment
+- Google Drive tools: search, read, upload, create folder, delete, shared drives
+- Google Sheets tools: create, read, write, append, clear, add/delete sheet
+- Auto OAuth flow s PKCE (otevře prohlížeč, uloží token)
+- Oprava reply bugu z google-workspace-mcp (diakritika v hlavičkách)
+- Automatický Gmail podpis
+- Dockerfile pro Cloud Run
