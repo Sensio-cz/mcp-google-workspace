@@ -120,6 +120,9 @@ async def gmail_remove_label(email_id: str, label_id: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-async def gmail_bulk_delete_messages(message_ids: list[str]) -> dict[str, Any]:
-    """Hromadne smaz emaily dle seznamu ID."""
-    return _get_gmail().bulk_delete(message_ids)
+async def gmail_trash(email_id: str) -> dict[str, Any]:
+    """Presun email do kose (obnovitelny 30 dni)."""
+    return _get_gmail().trash(email_id)
+
+
+# gmail_bulk_delete_messages - zakazano z bezpecnostnich duvodu

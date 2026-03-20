@@ -301,6 +301,11 @@ class GmailService:
 
     # --- Bulk ---
 
+    def trash(self, email_id: str) -> dict:
+        """Presun email do kose (obnovitelny 30 dni)."""
+        self.service.users().messages().trash(userId="me", id=email_id).execute()
+        return {"success": True, "trashed": email_id}
+
     def bulk_delete(self, message_ids: list[str]) -> dict:
         """Hromadne smazani emailu."""
         self.service.users().messages().batchDelete(

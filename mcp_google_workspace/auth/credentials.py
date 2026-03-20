@@ -87,7 +87,29 @@ def get_google_credentials() -> Credentials:
     if os.environ.get("MCP_TRANSPORT") == "streamable-http":
         raise RuntimeError("Chybi Google credentials. Kazdy uzivatel se musi prihlasit pres OAuth.")
 
-    # 4. Lokalne - credentials chybi, uzivatel musi spustit setup
-    raise RuntimeError(
-        "Google credentials nenalezeny. Spustte v terminalu: mcp-google-workspace --setup"
-    )
+    # 4. Lokalne - spustit OAuth na pozadi a vratit auth URL
+    _start_oauth_if_needed()
+
+    # Pokud uz OAuth dobehlo (rychle), pouzit vysledek
+    if _oauth_done.wait(timeout=2):
+        if _oauth_error:
+            raise RuntimeError(f"Prihlaseni selhalo: {_oauth_error}")
+        if _oauth_result:
+            return Credentials(
+                token=_oauth_result.get("access_token"),
+                refresh_token=_oauth_result["refresh_token"],
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=client_id,
+                client_secret=client_secret,
+            )
+
+    # OAuth jeste probiha - vratit URL pro uzivatele
+    from .oauth_flow import get_pending_auth_url
+    auth_url = get_pending_auth_url()
+    if auth_url:
+        raise RuntimeError(
+            f"Prihlaste se ke Google uctu kliknutim na tento odkaz:\n\n{auth_url}\n\n"
+            "Po prihlaseni zkuste pozadavek znovu."
+        )
+
+    raise RuntimeError("OAuth flow se nespustil. Zkuste restartovat VS Code.")
