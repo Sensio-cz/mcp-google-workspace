@@ -9,11 +9,20 @@ Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: 
 ### Přidáno
 - Admin odkazy v `/status/users` (GitHub, Cloud Build, Cloud Run, Logs, OAuth)
 
+## [0.2.9] - 21. 3. 2026, 00:20
+
+### Opraveno
+- Odstranění admin odkazů (GitHub, Cloud Run) z veřejné status stránky
+
+## [0.2.8] - 21. 3. 2026, 00:15
+
+### Opraveno
+- HTMLResponse import error na `/status/users` (UnboundLocalError)
+
+## [0.2.7] - 21. 3. 2026, 00:10
+
 ### Opraveno
 - Bezpečná 403 stránka bez nápovědy pro útočníka (žádný hint na `?key=`)
-- HTMLResponse import error na `/status/users`
-- Odstranění admin odkazů z veřejné status stránky
-- Version bump při každém deployi
 
 ## [0.2.6] - 20. 3. 2026, 23:30
 
