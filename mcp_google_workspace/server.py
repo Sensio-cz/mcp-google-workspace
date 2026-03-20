@@ -151,6 +151,15 @@ async def status_users(request: Request):
     <tr><th>Email</th><th>Tool callů</th><th>Chyb</th><th>První přístup</th><th>Poslední aktivita</th><th>Poslední přihlášení</th></tr>
     {rows if rows else '<tr><td colspan="6" style="text-align:center;color:#999">Zatím žádní uživatelé</td></tr>'}
   </table>
+  <h2 style="color:#1C3E63;font-size:16px;margin:24px 0 12px">Denní historie</h2>
+  <table>
+    <tr><th>Datum</th><th>Uživatel</th><th>Tool callů</th><th>Chyb</th></tr>
+    {"".join(
+        f'<tr><td>{day}</td><td>{u["email"]}</td><td>{d["calls"]}</td><td>{d["errors"]}</td></tr>'
+        for u in stats["users"]
+        for day, d in sorted(u.get("daily", {}).items(), reverse=True)
+    ) or '<tr><td colspan="4" style="text-align:center;color:#999">Zatím žádná data</td></tr>'}
+  </table>
   <a href="/" class="back">← Zpět na status</a>
 </div>
 </body>

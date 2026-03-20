@@ -124,6 +124,14 @@ class TokenStore:
             if tool_name:
                 tools = self._stats[email]["tools_used"]
                 tools[tool_name] = tools.get(tool_name, 0) + 1
+            # Denní historie
+            day = datetime.now().strftime("%Y-%m-%d")
+            daily = self._stats[email].setdefault("daily", {})
+            if day not in daily:
+                daily[day] = {"calls": 0, "errors": 0}
+            daily[day]["calls"] += 1
+            if error:
+                daily[day]["errors"] += 1
             self._save_stats()
 
     def track_login(self, email: str):
@@ -157,6 +165,7 @@ class TokenStore:
                     "first_seen": s.get("first_seen", "?"),
                     "last_seen": s.get("last_seen", "?"),
                     "last_login": s.get("last_login", "?"),
+                    "daily": s.get("daily", {}),
                 })
             return {
                 "total_users": total_users,
