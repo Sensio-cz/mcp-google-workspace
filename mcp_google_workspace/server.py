@@ -101,7 +101,12 @@ async def status_page(request: Request):
 
 @mcp.custom_route("/status/users", methods=["GET"])
 async def status_users(request: Request):
-    """Statistiky uživatelů a tool callů."""
+    """Statistiky uživatelů a tool callů. Chráněno API klíčem."""
+    admin_key = os.environ.get("MCP_ADMIN_KEY", "")
+    provided_key = request.query_params.get("key", "")
+    if not admin_key or provided_key != admin_key:
+        return JSONResponse({"error": "Přístup odepřen. Použijte ?key=VÁŠ_KLÍČ"}, status_code=403)
+
     stats = token_store.get_usage_stats()
 
     rows = ""
