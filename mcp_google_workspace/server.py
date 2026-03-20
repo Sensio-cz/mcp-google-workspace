@@ -5,7 +5,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.auth.provider import construct_redirect_uri
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, JSONResponse
+from starlette.responses import RedirectResponse, JSONResponse, HTMLResponse
 
 from .auth.oauth_provider import GoogleProxyOAuthProvider
 from .auth.token_store import token_store
@@ -105,7 +105,17 @@ async def status_users(request: Request):
     admin_key = os.environ.get("MCP_ADMIN_KEY", "")
     provided_key = request.query_params.get("key", "")
     if not admin_key or provided_key != admin_key:
-        return JSONResponse({"error": "Přístup odepřen. Použijte ?key=VÁŠ_KLÍČ"}, status_code=403)
+        return HTMLResponse("""<html>
+<head><meta charset="utf-8"><title>Sensio MCP</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Barlow',Arial,sans-serif;background:#f5f7fa;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.card{background:white;border-radius:12px;padding:48px;max-width:440px;text-align:center;box-shadow:0 4px 24px rgba(28,62,99,0.1)}
+.logo{color:#1C3E63;font-size:28px;font-weight:700;margin-bottom:24px}.logo span{color:#D67E29}
+h1{color:#1C3E63;font-size:22px;margin-bottom:12px}p{color:#555;font-size:15px;line-height:1.5}</style></head>
+<body><div class="card">
+<div class="logo">sensio<span>.cz</span></div>
+<h1>Neautorizovaný přístup</h1>
+<p>Tato stránka není veřejně dostupná.</p>
+</div></body></html>""", status_code=403)
 
     stats = token_store.get_usage_stats()
 
