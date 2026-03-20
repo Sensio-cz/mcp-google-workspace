@@ -4,6 +4,17 @@ Všechny podstatné změny v projektu mcp-google-workspace.
 
 Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
 
+## [0.2.10] - 21. 3. 2026, 00:30
+
+### Přidáno
+- Admin odkazy v `/status/users` (GitHub, Cloud Build, Cloud Run, Logs, OAuth)
+
+### Opraveno
+- Bezpečná 403 stránka bez nápovědy pro útočníka (žádný hint na `?key=`)
+- HTMLResponse import error na `/status/users`
+- Odstranění admin odkazů z veřejné status stránky
+- Version bump při každém deployi
+
 ## [0.2.6] - 20. 3. 2026, 23:30
 
 ### Přidáno
