@@ -257,6 +257,48 @@ class GmailService:
         ).execute()
         return {"data": att["data"], "size": att["size"]}
 
+    # --- Labels / Modify ---
+
+    def _modify_message(self, email_id: str, add_labels: list[str] | None = None, remove_labels: list[str] | None = None) -> dict:
+        """Uprav labely zpravy."""
+        body = {}
+        if add_labels:
+            body["addLabelIds"] = add_labels
+        if remove_labels:
+            body["removeLabelIds"] = remove_labels
+        self.service.users().messages().modify(
+            userId="me", id=email_id, body=body
+        ).execute()
+        return {"success": True, "email_id": email_id}
+
+    def mark_as_read(self, email_id: str) -> dict:
+        """Oznac email jako precteny."""
+        return self._modify_message(email_id, remove_labels=["UNREAD"])
+
+    def mark_as_unread(self, email_id: str) -> dict:
+        """Oznac email jako neprecteny."""
+        return self._modify_message(email_id, add_labels=["UNREAD"])
+
+    def archive(self, email_id: str) -> dict:
+        """Archivuj email (odeber z inboxu)."""
+        return self._modify_message(email_id, remove_labels=["INBOX"])
+
+    def star(self, email_id: str) -> dict:
+        """Pridej hvezdicku."""
+        return self._modify_message(email_id, add_labels=["STARRED"])
+
+    def unstar(self, email_id: str) -> dict:
+        """Odeber hvezdicku."""
+        return self._modify_message(email_id, remove_labels=["STARRED"])
+
+    def add_label(self, email_id: str, label_id: str) -> dict:
+        """Pridej label k emailu."""
+        return self._modify_message(email_id, add_labels=[label_id])
+
+    def remove_label(self, email_id: str, label_id: str) -> dict:
+        """Odeber label z emailu."""
+        return self._modify_message(email_id, remove_labels=[label_id])
+
     # --- Bulk ---
 
     def bulk_delete(self, message_ids: list[str]) -> dict:

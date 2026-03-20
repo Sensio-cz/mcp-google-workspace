@@ -78,6 +78,48 @@ async def gmail_send_email(
 
 
 @mcp.tool()
+async def gmail_mark_as_read(email_id: str) -> dict[str, Any]:
+    """Oznac email jako precteny."""
+    return _get_gmail().mark_as_read(email_id)
+
+
+@mcp.tool()
+async def gmail_mark_as_unread(email_id: str) -> dict[str, Any]:
+    """Oznac email jako neprecteny."""
+    return _get_gmail().mark_as_unread(email_id)
+
+
+@mcp.tool()
+async def gmail_archive(email_id: str) -> dict[str, Any]:
+    """Archivuj email (odeber z inboxu)."""
+    return _get_gmail().archive(email_id)
+
+
+@mcp.tool()
+async def gmail_star(email_id: str) -> dict[str, Any]:
+    """Pridej hvezdicku k emailu."""
+    return _get_gmail().star(email_id)
+
+
+@mcp.tool()
+async def gmail_unstar(email_id: str) -> dict[str, Any]:
+    """Odeber hvezdicku z emailu."""
+    return _get_gmail().unstar(email_id)
+
+
+@mcp.tool()
+async def gmail_add_label(email_id: str, label_id: str) -> dict[str, Any]:
+    """Pridej label k emailu."""
+    return _get_gmail().add_label(email_id, label_id)
+
+
+@mcp.tool()
+async def gmail_remove_label(email_id: str, label_id: str) -> dict[str, Any]:
+    """Odeber label z emailu."""
+    return _get_gmail().remove_label(email_id, label_id)
+
+
+@mcp.tool()
 async def gmail_bulk_delete_messages(message_ids: list[str]) -> dict[str, Any]:
     """Hromadne smaz emaily dle seznamu ID."""
     return _get_gmail().bulk_delete(message_ids)
