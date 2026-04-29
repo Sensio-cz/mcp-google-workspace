@@ -1,7 +1,7 @@
 [project]
 name = "mcp-google-workspace"
-version = "0.2.10"
-description = "MCP server for Google Workspace (Gmail, Drive, Sheets) with auto OAuth flow and Gmail signature support"
+version = "0.3.0"
+description = "MCP server for Google Workspace (Gmail, Drive, Sheets, Calendar) with auto OAuth flow and Gmail signature support"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [{name = "Sensio.cz", email = "info@sensio.cz"}]
