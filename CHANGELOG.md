@@ -4,6 +4,29 @@ Všechny podstatné změny v projektu mcp-google-workspace.
 
 Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 29. 4. 2026
+
+### Přidáno
+- **Google Calendar tools** (closes #1):
+  - `calendar_list_events` - výpis událostí v okně času
+  - `calendar_create_event` - vytvoření události s podporou welcome-board konvencí (Welcome:/Company:/Photo:/Sound:/Greeting:/Background: tagy v description, auto-attach Workspace room resource via Directory API)
+  - `calendar_patch_event` - partial update události
+  - `calendar_delete_event` - smazání s multi-calendar fallback (priorita požadovaný → fallback_calendars; 204/410 = úspěch, 404 ze všech = úspěch „už nikde nejsou", jiná chyba = error)
+  - `calendar_list_rooms` - výpis Workspace Room Resources (cache 24h)
+  - `calendar_find_room_email` - lookup mistnosti podle name match
+- `mcp_google_workspace/services/calendar.py` - business logika portovaná z welcome-board-sensio/backend/lib/calendar.php (parse welcome tagů, normalize, multi-calendar delete, room cache)
+- `mcp_google_workspace/tools/calendar.py` - tool registrace přes @mcp.tool()
+
+### DwD scopes potřebné navíc
+- `https://www.googleapis.com/auth/calendar.events` (existující v Sensio MCP DwD)
+- `https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly` (existující, pro auto-attach místností)
+
+Bez druhého scope `auto_attach_room=True` graceful no-op (event vznikne bez room resource).
+
+### Související
+- Issue #1 (mcp-google-workspace): Add Calendar tools - CLOSED
+- Issue Sensio-os#70 (Phase 2 master): blokátor odstraněn
+
 ## [0.2.10] - 21. 3. 2026, 00:30
 
 ### Přidáno

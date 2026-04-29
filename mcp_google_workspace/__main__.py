@@ -2,7 +2,7 @@ import os
 from .server import mcp
 
 # Importy registruji tools pres @mcp.tool() decorator
-from .tools import gmail, drive, sheets  # noqa: F401
+from .tools import gmail, drive, sheets, calendar  # noqa: F401
 
 
 def main():
