@@ -81,7 +81,7 @@ async def status_page(request: Request):
   <div class="info">
     <strong>Verze:</strong> {ver}<br>
     <strong>Dostupné tools:</strong> {tools_count}<br>
-    <strong>Služby:</strong> Gmail, Google Drive, Google Sheets<br>
+    <strong>Služby:</strong> Gmail, Google Drive, Google Sheets, Google Calendar<br>
     <strong>Autentizace:</strong> OAuth 2.0 (Google)<br>
     <strong>Status:</strong> Running
   </div>
