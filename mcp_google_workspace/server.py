@@ -8,17 +8,27 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse, JSONResponse, HTMLResponse
 
 from .auth.oauth_provider import GoogleProxyOAuthProvider
+from .auth.sealed import klic_je
 from .auth.token_store import token_store
 from .config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
 
+# ADRESA, KTEROU SERVER O SOBE HLASI. Jde do OAuth metadat (issuer, resource)
+# i do redirect_uri, ktere se posila Googlu. Kdyz nesedi s adresou, na kterou
+# klient opravdu chodi, klient se autorizuje proti jednomu jmenu a vola druhe.
+# Zmereno 22. 9. 2026: na produkci promenna nastavena nebyla, takze server
+# hlasil `...run.app`, zatimco konektor chodil na mcp-google-workspace.sensio.cz.
 SERVER_URL = os.environ.get(
     "MCP_SERVER_URL",
-    "https://mcp-google-workspace-581084999054.europe-west1.run.app",
-)
+    "https://mcp-google-workspace.sensio.cz",
+).rstrip("/")
 
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+# KLIC SE VYZADUJE AZ PRI HTTP REZIMU (viz __main__.py). Lokalni stdio beh
+# zadne MCP tokeny nevydava - bere Google credentials ze souboru - takze by
+# ho povinny klic zbytecne rozbil. Nalez reviewu 22. 9. 2026.
 
 oauth_provider = GoogleProxyOAuthProvider(
     server_url=SERVER_URL,
@@ -39,7 +49,11 @@ mcp = FastMCP(
             valid_scopes=["mcp:tools"],
             default_scopes=["mcp:tools"],
         ),
-        revocation_options=RevocationOptions(enabled=True),
+        # ODVOLANI SE NEINZERUJE, protoze ho server neumi: zapecetene tokeny
+        # nemaji kde vest seznam odvolanych. Endpoint, ktery vrati 200 a nic
+        # neudela, je horsi nez zadny - clovek si mysli, ze pristup ukoncil.
+        # Hromadne odvolani = vymena MCP_TOKEN_KEY (docs/nasazeni-a-klice.md).
+        revocation_options=RevocationOptions(enabled=False),
     ),
 )
 
@@ -254,17 +268,13 @@ async def google_callback(request: Request):
     logger.info(f"[AUTH] Nový uživatel přihlášen: {user_email}")
     token_store.track_login(user_email)
 
-    # Create MCP auth code
-    mcp_code = oauth_provider.create_auth_code_for_client(client_id, mcp_params)
-
-    # Store Google token mapped to MCP auth code (will be promoted on exchange)
-    token_store.store_google_token(mcp_code, {
-        "access_token": google_tokens.get("access_token"),
-        "refresh_token": google_tokens["refresh_token"],
-        "token_type": google_tokens.get("token_type", "Bearer"),
-        "expires_in": google_tokens.get("expires_in"),
-        "user_email": user_email,
-    })
+    # Google refresh token putuje UVNITR auth kodu a pak uvnitr vydanych tokenu.
+    # Drive se ukladal do mapy v /tmp jedne instance - a prave tim se pristup
+    # ztracel pri uspani instance nebo pri druhe instanci.
+    mcp_code = oauth_provider.create_auth_code_for_client(
+        client_id, mcp_params,
+        google={"rt": google_tokens["refresh_token"], "e": user_email},
+    )
 
     # Redirect back to claude.ai with the MCP auth code
     redirect_url = construct_redirect_uri(

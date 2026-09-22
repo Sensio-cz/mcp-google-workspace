@@ -12,12 +12,18 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "mcp[cli]>=1.0.0",
+    # HORNI MEZ JE NUTNA: v mcp 2.x zmizel `mcp.server.fastmcp` (FastMCP se
+    # prejmenoval na MCPServer), takze server.py se s nim ani nenaimportuje.
+    # Docker stahuje zavislosti podle tohohle souboru, ne podle uv.lock, takze
+    # bez meze by prvni build po vydani 2.0 shodil nasazeni. Zmereno reviewem
+    # 22. 9. 2026. Migrace na 2.x je samostatna prace.
+    "mcp[cli]>=1.0.0,<2",
     "google-auth>=2.0.0",
     "google-auth-oauthlib>=1.0.0",
     "google-api-python-client>=2.0.0",
     "uvicorn>=0.30.0",
     "httpx>=0.27.0",
+    "cryptography>=42.0.0",
 ]
 
 [project.urls]

@@ -3,11 +3,13 @@ Helper to get Google credentials for the current request from the MCP auth conte
 """
 
 import logging
+import os
+
 from google.oauth2.credentials import Credentials
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 
-from .token_store import token_store
+from .token_store import token_store, google_credentials_z_tokenu, email_z_tokenu
 from .credentials import get_google_credentials as get_fallback_credentials
 
 logger = logging.getLogger(__name__)
@@ -21,15 +23,24 @@ def get_current_google_credentials() -> Credentials:
     """
     access_token = get_access_token()
     if access_token:
-        creds = token_store.get_google_credentials(access_token.token)
+        creds = google_credentials_z_tokenu(access_token.token)
         if creds:
-            user_email = token_store.get_user_email(access_token.token)
+            user_email = email_z_tokenu(access_token.token)
             logger.info(f"[TOOL] Uživatel: {user_email}")
             token_store.track_tool_call(user_email)
             return creds
         logger.warning(
-            f"No Google token found for MCP token {access_token.token[:8]}..., "
-            "falling back to env credentials"
+            "MCP token nenese Google udaje. Nejspis jde o token vydany starsi "
+            "verzi serveru - staci konektor znovu pripojit."
+        )
+
+    # V HTTP REZIMU SE NA ENV CREDENTIALS NEPADA. Ty patri majiteli serveru,
+    # takze by prihlaseny cizi uzivatel dostal do ruky JEHO schranku. Puvodni
+    # pojistka v credentials.py se testuje az po nacteni promenne, takze
+    # nechrani - zmereno nezavislym reviewem 22. 9. 2026.
+    if os.environ.get("MCP_TRANSPORT", "stdio") != "stdio":
+        raise PermissionError(
+            "Tenhle MCP token nenese Google pristup. Odpoj a znovu pripoj konektor."
         )
 
     # Fallback: env vars / local credentials file (for stdio transport)
