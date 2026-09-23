@@ -11,7 +11,7 @@
 - [ ] Gmail tools fungují (query, reply, draft)
 - [ ] Drive tools fungují (search, read)
 - [ ] Sheets tools fungují (read, write)
-- [ ] Cloud Run build projde
+- [ ] Po merge NASADIT RUCNE: `gcloud run deploy mcp-google-workspace --source . --region europe-west1 --project mzdy-487615` (auto-deploy neexistuje, viz CLAUDE.md)
 - [ ] Status stránka ukazuje správnou verzi
 
 ## Checklist

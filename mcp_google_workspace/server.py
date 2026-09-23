@@ -8,7 +8,6 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse, JSONResponse, HTMLResponse
 
 from .auth.oauth_provider import GoogleProxyOAuthProvider
-from .auth.sealed import klic_je
 from .auth.token_store import token_store
 from .config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
@@ -26,9 +25,11 @@ SERVER_URL = os.environ.get(
 
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 
-# KLIC SE VYZADUJE AZ PRI HTTP REZIMU (viz __main__.py). Lokalni stdio beh
-# zadne MCP tokeny nevydava - bere Google credentials ze souboru - takze by
-# ho povinny klic zbytecne rozbil. Nalez reviewu 22. 9. 2026.
+# KLIC SE VYZADUJE AZ PRI HTTP REZIMU - kontrola je v `__main__.py:main()`,
+# hned po precteni MCP_TRANSPORT. Lokalni stdio beh zadne MCP tokeny nevydava
+# (bere Google credentials ze souboru), takze by ho povinny klic zbytecne
+# rozbil. Nalez reviewu 22. 9. 2026, kontrola doplnena 23. 9. 2026 - do te doby
+# tenhle komentar odkazoval na kontrolu, ktera neexistovala.
 
 oauth_provider = GoogleProxyOAuthProvider(
     server_url=SERVER_URL,

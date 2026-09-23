@@ -24,6 +24,27 @@ def main():
         return
 
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
+
+    # KONTROLA KLICE PATRI SEM, NA START. Dokumentace tvrdila, ze bez
+    # MCP_TOKEN_KEY server "nenastartuje" - neplatilo to: `klic_je()` sice bylo
+    # v server.py naimportovane, ale nikde se nevolalo, takze proces nabehl,
+    # /.well-known vracel 200 a rozbilo se to az uzivateli na `/register`
+    # chybou 500 bez vysvetleni. Nasazeni pritom bylo zelene. Zmereno
+    # nezavislym reviewem 23. 9. 2026.
+    #
+    # Stdio beh klic nepotrebuje: zadne MCP tokeny nevydava, Google credentials
+    # bere ze souboru.
+    if transport != "stdio":
+        from .auth.sealed import klic_je
+
+        if not klic_je():
+            raise SystemExit(
+                "Chybi MCP_TOKEN_KEY. V rezimu "
+                f"MCP_TRANSPORT={transport} se jim pecetí vydavane tokeny, "
+                "takze bez nej skonci prvni prihlaseni chybou 500. "
+                "Vygenerovani a nasazeni klice: docs/nasazeni-a-klice.md."
+            )
+
     mcp.run(transport=transport)
 
 
