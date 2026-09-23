@@ -4,8 +4,13 @@ from pathlib import Path
 CONFIG_DIR = Path.home() / ".config" / "mcp-google"
 CREDENTIALS_FILE = CONFIG_DIR / "credentials.json"
 
-# OAuth Client ID - verejny identifikator aplikace (ne secret)
-# Pouziva se s PKCE flow - zadny Client Secret neni potreba
+# OAuth Client ID - verejny identifikator aplikace (ne secret).
+#
+# POZOR, PKCE SAMO O SOBE GOOGLU NESTACI. Drive tu stalo, ze s PKCE zadny
+# Client Secret neni potreba; zmereno 23. 9. 2026 proti skutecnemu
+# oauth2.googleapis.com/token to neplati ani u tohohle desktopoveho klienta:
+# vymena kodu i obnova tokenu bez secretu konci `400 invalid_request:
+# client_secret is missing`. PKCE je u Googlu obrana NAVIC, ne nahrada.
 GOOGLE_CLIENT_ID = os.environ.get(
     "GOOGLE_WORKSPACE_CLIENT_ID",
     "581084999054-tt8lg3fgp975ohh8abgvivo57tgupimp.apps.googleusercontent.com",
