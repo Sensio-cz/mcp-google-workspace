@@ -111,9 +111,24 @@ mcp-google-workspace/
 - Region: europe-west1
 - URL: https://mcp-google-workspace-581084999054.europe-west1.run.app
 - Doména: https://mcp-google-workspace.sensio.cz
-- Auto-deploy: push na master → Cloud Build → Cloud Run
+- **Nasazuje se RUČNĚ. Žádný auto-deploy neexistuje.** Do 23. 9. 2026 tu stálo
+  „push na master → Cloud Build → Cloud Run"; změřeno to neplatí -
+  `gcloud builds triggers list` je prázdný a merge PR #4 se nenasadil.
+  Zmergovat tedy **nestačí**, je potřeba:
+
+  ```bash
+  gcloud run deploy mcp-google-workspace --source .     --region europe-west1 --project mzdy-487615
+  ```
+
+  Ověř pak, že běží nová revize: `gcloud run revisions list --service
+  mcp-google-workspace --region europe-west1 --project mzdy-487615 --limit 3`
 
 ### OAuth
-- Desktop klient: pro lokální použití (PKCE flow)
-- Web klient: pro Cloud Run remote (claude.ai connector)
+- Desktop klient: pro lokální použití. PKCE **i** client secret - Google secret
+  vyžaduje i při PKCE, samotné PKCE mu nestačí (změřeno 23. 9. 2026).
+- Web klient: pro Cloud Run remote (claude.ai connector). Jeho `client_id`
+  i secret jsou v prostředí služby, ne v kódu.
+- `MCP_TOKEN_KEY` (povinný pro Cloud Run) leží v Secret Manageru jako tajemství
+  `mcp-token-key`; čte ho servisní účet `581084999054-compute@developer.gserviceaccount.com`.
+  Výměna klíče odhlásí všechny uživatele - podrobnosti v `docs/nasazeni-a-klice.md`.
 - Scopes: gmail.readonly, gmail.send, gmail.compose, gmail.modify, drive, spreadsheets

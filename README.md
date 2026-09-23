@@ -28,7 +28,11 @@ Přidejte do `.mcp.json`:
 }
 ```
 
-Při prvním použití se otevře prohlížeč pro Google přihlášení. Token se uloží do `~/.config/mcp-google/credentials.json`.
+**Nejdřív nastavte `GOOGLE_WORKSPACE_CLIENT_SECRET`** (viz [Konfigurace](#konfigurace)).
+Bez ní přihlášení skončí hned výjimkou - Google client secret vyžaduje i při PKCE.
+
+Při prvním použití se pak otevře prohlížeč pro Google přihlášení. Token se uloží do
+`~/.config/mcp-google/credentials.json`.
 
 ## Cloud Run (remote)
 
