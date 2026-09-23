@@ -11,6 +11,7 @@ mcp-google-workspace/
 │   ├── server.py            # FastMCP instance, OAuth provider, status stránka, /google/callback
 │   ├── config.py            # OAuth Client ID/Secret, cesty k credentials
 │   ├── auth/
+│   │   ├── sealed.py        # Pečetění hodnot (Fernet) - client_id, kódy, tokeny
 │   │   ├── credentials.py   # Načítání credentials (env → soubor → OAuth flow)
 │   │   ├── oauth_flow.py    # Lokální PKCE OAuth flow (otevře prohlížeč)
 │   │   ├── oauth_provider.py# Remote OAuth provider (proxy na Google pro claude.ai)
@@ -19,18 +20,22 @@ mcp-google-workspace/
 │   ├── services/
 │   │   ├── gmail.py         # GmailService - 23 metod (query, reply, draft, labels, trash...)
 │   │   ├── drive.py         # DriveService - 7 metod (search, read, upload, folder, delete)
-│   │   └── sheets.py        # SheetsService - 7 metod (create, read, write, append, clear, add/delete)
+│   │   ├── sheets.py        # SheetsService - 7 metod (create, read, write, append, clear, add/delete)
+│   │   └── calendar.py      # CalendarService - události a místnosti
 │   └── tools/
 │       ├── gmail.py         # 16 Gmail tools (1 zakázán: bulk_delete)
 │       ├── drive.py         # 6 Drive tools
-│       └── sheets.py        # 7 Sheets tools
+│       ├── sheets.py        # 7 Sheets tools
+│       └── calendar.py      # 6 Calendar tools
+├── docs/nasazeni-a-klice.md  # Klíč na tokeny, adresa serveru, secret
+├── tests/                    # pytest; `uv run --with pytest --with cryptography pytest tests/ -q`
 ├── Dockerfile               # Cloud Run deployment
 ├── pyproject.toml            # Verze, závislosti, entry point
 ├── CHANGELOG.md              # Historie změn
 └── README.md                 # Dokumentace, tools inventář
 ```
 
-## Tools inventář (28 aktivních)
+## Tools inventář (35 aktivních: 16 Gmail + 6 Drive + 7 Sheets + 6 Calendar)
 
 ### Gmail (16)
 | Tool | Popis |
@@ -111,9 +116,31 @@ mcp-google-workspace/
 - Region: europe-west1
 - URL: https://mcp-google-workspace-581084999054.europe-west1.run.app
 - Doména: https://mcp-google-workspace.sensio.cz
-- Auto-deploy: push na master → Cloud Build → Cloud Run
+- **Nasazuje se RUČNĚ. Žádný auto-deploy neexistuje.** Do 23. 9. 2026 tu stálo
+  „push na master → Cloud Build → Cloud Run"; změřeno to neplatí -
+  `gcloud builds triggers list` je prázdný a merge PR #4 se nenasadil.
+  Zmergovat tedy **nestačí**, je potřeba:
+
+  ```bash
+  gcloud run deploy mcp-google-workspace --source .     --region europe-west1 --project mzdy-487615
+  ```
+
+  Ověř pak, že běží nová revize: `gcloud run revisions list --service
+  mcp-google-workspace --region europe-west1 --project mzdy-487615 --limit 3`
 
 ### OAuth
-- Desktop klient: pro lokální použití (PKCE flow)
-- Web klient: pro Cloud Run remote (claude.ai connector)
+- Desktop klient: pro lokální použití. PKCE **i** client secret - Google secret
+  vyžaduje i při PKCE, samotné PKCE mu nestačí (změřeno 23. 9. 2026).
+- Web klient: pro Cloud Run remote (claude.ai connector). Jeho `client_id`
+  i secret jsou v prostředí služby, ne v kódu.
+- `MCP_TOKEN_KEY` (povinný pro HTTP režim) leží v Secret Manageru jako tajemství
+  `mcp-token-key`. **Pozor: účet, který službu nasazuje, a účet, pod kterým běží,
+  jsou dva různé** (změřeno 23. 9. 2026) a `secretAccessor` binding je jen na tom
+  prvním. Než budeš upravovat práva ke klíči, **změř si, kdo ho čte**:
+  `gcloud run services describe mcp-google-workspace --region europe-west1
+  --format="value(spec.template.spec.serviceAccountName)"` a
+  `gcloud secrets get-iam-policy mcp-token-key`. Jinak službu rozbiješ.
+  Tohle nastavení je vedené k nápravě mimo repozitář (veřejný repo není místo
+  na popis toho, jak jsou nastavená práva).
+  Výměna klíče odhlásí všechny uživatele - podrobnosti v `docs/nasazeni-a-klice.md`.
 - Scopes: gmail.readonly, gmail.send, gmail.compose, gmail.modify, drive, spreadsheets

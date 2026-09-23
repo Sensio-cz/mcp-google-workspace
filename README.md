@@ -1,7 +1,7 @@
 # mcp-google-workspace
 
 ![Status: Beta](https://img.shields.io/badge/status-beta-yellow)
-![Version](https://img.shields.io/badge/version-0.2.1-blue)
+![Version](https://img.shields.io/badge/version-0.3.0-blue)
 
 MCP server pro Google Workspace (Gmail, Drive, Sheets) s automatickým OAuth flow a multi-user autentizací.
 
@@ -10,6 +10,9 @@ MCP server pro Google Workspace (Gmail, Drive, Sheets) s automatickým OAuth flo
 - **Gmail**: query, read, reply, draft, send, archive, star, trash - s automatickým podpisem
 - **Google Drive**: search, read, upload, create folders, delete
 - **Google Sheets**: read, write, append, clear, add/delete sheets
+- **Google Calendar**: list/create/patch/delete událostí, výpis a hledání místností
+  (**pozor:** přihlašovací flow zatím o Calendar oprávnění nežádá, takže nově
+  přihlášený uživatel tyhle nástroje nerozjede - viz `SCOPES` v `auth/oauth_flow.py`)
 - **Auto OAuth**: při prvním použití se otevře prohlížeč pro Google přihlášení
 - **Multi-user**: každý uživatel se přihlásí svým účtem (Cloud Run remote)
 - **Reply fix**: správně zpracovává diakritiku v hlavičkách emailů
@@ -22,13 +25,45 @@ Přidejte do `.mcp.json`:
 {
   "mcpServers": {
     "google-workspace": {
-      "command": "mcp-google-workspace"
+      "command": "mcp-google-workspace",
+      "env": {
+        "GOOGLE_WORKSPACE_CLIENT_SECRET": "..."
+      }
     }
   }
 }
 ```
 
-Při prvním použití se otevře prohlížeč pro Google přihlášení. Token se uloží do `~/.config/mcp-google/credentials.json`.
+Server spouští MCP klient, ne vy, takže proměnná patří sem do `env` - export
+v shellu se k němu nemusí dostat.
+
+`"command": "mcp-google-workspace"` počítá s tím, že server je nainstalovaný
+v `PATH`. Při vývoji z checkoutu (`uv sync`) leží spustitelný soubor v `.venv`,
+takže uveďte celou cestu, nebo použijte `"command": "uv"` s
+`"args": ["run", "--project", "/cesta/k/mcp-google-workspace", "mcp-google-workspace"]`.
+
+**Nejdřív nastavte `GOOGLE_WORKSPACE_CLIENT_SECRET`** (viz [Konfigurace](#konfigurace)).
+Bez ní přihlášení skončí hned výjimkou - Google client secret vyžaduje i při PKCE.
+
+Při prvním použití se pak otevře prohlížeč pro Google přihlášení. Token se uloží do
+`~/.config/mcp-google/credentials.json`.
+
+## Lokální vývoj a testy
+
+```bash
+git clone https://github.com/Sensio-cz/mcp-google-workspace.git
+cd mcp-google-workspace
+uv sync                 # nebo: pip install -e .
+
+uv run --with pytest --with cryptography pytest tests/ -q
+```
+
+Client secret pro vývoj najdete v [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+u klienta „Sensio MCP" (projekt `mzdy-487615`). **Nikam ho nezapisujte v repu** -
+do 22. 9. 2026 stál jako výchozí hodnota v `config.py` a tenhle repozitář je veřejný.
+
+**Nasazení není automatické.** Merge do `master` nic nenasadí; po merge je potřeba
+pustit deploy ručně, postup je v `CLAUDE.md`.
 
 ## Cloud Run (remote)
 

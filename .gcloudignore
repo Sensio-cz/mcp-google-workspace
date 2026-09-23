@@ -1,0 +1,19 @@
+# POZOR: existence tohohle souboru VYPINA odvozovani z .gitignore. Bez radku
+# nize by `gcloud run deploy --source .` nahral do Cloud Buildu i `.env` a
+# `credentials.json`, ktere .gitignore drzi mimo repo. Nalez nezavisleho
+# review 23. 9. 2026, zmereno filtrem SDK - oba soubory byly zahrnute.
+#!include:.gitignore
+
+# Jistota i kdyby se .gitignore zmenil: tajemstvi ven nikdy.
+.env
+.env.*
+credentials.json
+*.credentials.json
+
+# Do obrazu nepatri, jen by zdrzovalo upload (.venv ma 175 MB).
+.git
+.git/
+.venv/
+.pytest_cache/
+tests/
+docs/

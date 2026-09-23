@@ -17,9 +17,10 @@ jedno, která instance požadavek obslouží a kolikrát se služba restartuje.
 
 | Proměnná | Povinná | K čemu |
 |---|---|---|
-| `MCP_TOKEN_KEY` | **ano** | Klíč, kterým se pečetí tokeny. Bez něj server **nenastartuje**. |
+| `MCP_TOKEN_KEY` | **ano pro HTTP režim** | Klíč, kterým se pečetí tokeny. Bez něj server v HTTP režimu **nenastartuje** a řekne proč. Do 23. 9. 2026 to tu stálo, ale neplatilo to: proces naběhl a rozbilo se to až uživateli na `/register` chybou 500. Stdio běh klíč nepotřebuje. |
+| `MCP_ADMIN_KEY` | volitelné | Heslo ke stránce `/status/users` (předává se jako `?key=`). **Bez něj je výpis nepřístupný**, ne otevřený - `status_users()` odmítne i prázdný klíč (změřeno 23. 9. 2026). |
 | `MCP_SERVER_URL` | doporučeno | Adresa, kterou server o sobě hlásí v OAuth metadatech a posílá Googlu jako redirect. Výchozí je `https://mcp-google-workspace.sensio.cz`. |
-| `GOOGLE_WORKSPACE_CLIENT_SECRET` | ano pro web klienta | Secret OAuth klienta. **V kódu už není žádná výchozí hodnota.** |
+| `GOOGLE_WORKSPACE_CLIENT_SECRET` | **ano vždy** | Secret OAuth klienta. **V kódu už není žádná výchozí hodnota.** Povinný i pro lokální (stdio) přihlášení - Google ho vyžaduje i při PKCE (změřeno 23. 9. 2026). Do té doby tu stálo „ano pro web klienta", což platilo jen zdánlivě. |
 
 ### Vygenerování klíče
 
