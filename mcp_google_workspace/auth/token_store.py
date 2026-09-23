@@ -1,6 +1,18 @@
 """
-Token store mapping MCP access tokens to Google OAuth credentials.
-Uses a JSON file on disk (/tmp/mcp-tokens.json) for persistence within a Cloud Run instance.
+Statistiky pouziti a stavba Google credentials z obsahu MCP tokenu.
+
+UZ TO NENI ULOZISTE PRISTUPU. Puvodne tenhle soubor mapoval MCP tokeny na
+Google tokeny a drzel je v `/tmp/mcp-tokens.json`, tedy na disku JEDNE instance
+Cloud Runu - jak rikala i jeho puvodni hlavicka ("within a Cloud Run instance").
+Jakmile Cloud Run instanci uspal nebo pridal druhou, pristup se ztratil
+a kazde volani skoncilo `invalid_token`. Google refresh token proto dnes
+putuje zapecceny primo v MCP tokenu (auth/sealed.py) a tady zustavaji jen
+statistiky.
+
+STATISTIKY ZUSTAVAJI V /tmp A JE TO VEDOME: jsou to cisla do status stranky,
+ne pristup. Kdyz se instance uspi, cast historie se ztrati - to nikomu
+nezabrani v praci. Trvale by potrebovaly sdilene uloziste (Firestore),
+coz je samostatne rozhodnuti.
 """
 
 import json
@@ -12,6 +24,10 @@ from pathlib import Path
 from google.oauth2.credentials import Credentials
 
 from ..config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+from .sealed import rozpecet
+
+# Druh zapeceteneho pristupoveho tokenu - musi sedet s auth/oauth_provider.py.
+D_PRISTUP = "mcpt"
 
 logger = logging.getLogger(__name__)
 
@@ -29,64 +45,18 @@ GOOGLE_SCOPES = [
 
 
 class TokenStore:
-    """Maps MCP access tokens to Google OAuth refresh tokens."""
+    """Statistiky pouziti. Pristupy uz nedrzi - viz hlavicka souboru."""
 
     def __init__(self):
         self._lock = threading.Lock()
-        # In-memory cache: mcp_access_token -> google_token_data
-        self._tokens: dict[str, dict] = {}
         # Usage stats: email -> {tool_calls, first_seen, last_seen, errors}
         self._stats: dict[str, dict] = {}
         self._stats_path = TOKEN_STORE_PATH.parent / "mcp-stats.json"
-        self._load()
         self._load_stats()
 
-    def _load(self):
-        if TOKEN_STORE_PATH.exists():
-            try:
-                with open(TOKEN_STORE_PATH) as f:
-                    self._tokens = json.load(f)
-                logger.info(f"Loaded {len(self._tokens)} token mappings from {TOKEN_STORE_PATH}")
-            except Exception as e:
-                logger.warning(f"Failed to load token store: {e}")
-                self._tokens = {}
-
-    def _save(self):
-        try:
-            TOKEN_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with open(TOKEN_STORE_PATH, "w") as f:
-                json.dump(self._tokens, f, indent=2)
-        except Exception as e:
-            logger.error(f"Failed to save token store: {e}")
-
-    def store_google_token(self, mcp_auth_code: str, google_token_data: dict):
-        """Store Google token data mapped to an MCP auth code (pre-exchange).
-        Will be re-mapped when the MCP auth code is exchanged for an access token."""
-        with self._lock:
-            # Store under auth_code prefix temporarily
-            self._tokens[f"authcode:{mcp_auth_code}"] = google_token_data
-            self._save()
-        logger.info(f"Stored Google token for MCP auth code {mcp_auth_code[:8]}...")
-
-    def promote_auth_code_to_access_token(self, mcp_auth_code: str, mcp_access_token: str):
-        """When MCP exchanges auth code for access token, re-map the Google token."""
-        with self._lock:
-            key = f"authcode:{mcp_auth_code}"
-            google_data = self._tokens.pop(key, None)
-            if google_data:
-                self._tokens[mcp_access_token] = google_data
-                self._save()
-                logger.info(f"Promoted auth code to access token mapping")
-            else:
-                logger.warning(f"No Google token found for auth code {mcp_auth_code[:8]}...")
-
-    def promote_access_token(self, old_token: str, new_token: str):
-        """When MCP refreshes, move the Google token to the new access token."""
-        with self._lock:
-            google_data = self._tokens.pop(old_token, None)
-            if google_data:
-                self._tokens[new_token] = google_data
-                self._save()
+    def poznamenej_prihlaseni(self, email: str):
+        """Alias pro track_login - volany z vymeny auth kodu za tokeny."""
+        self.track_login(email)
 
     def _load_stats(self):
         if self._stats_path.exists():
@@ -174,29 +144,30 @@ class TokenStore:
                 "users": users,
             }
 
-    def get_user_email(self, mcp_access_token: str) -> str:
-        """Get user email for a given MCP access token."""
-        with self._lock:
-            google_data = self._tokens.get(mcp_access_token)
-        if not google_data:
-            return "unknown"
-        return google_data.get("user_email", "unknown")
-
-    def get_google_credentials(self, mcp_access_token: str) -> Credentials | None:
-        """Get Google credentials for a given MCP access token."""
-        with self._lock:
-            google_data = self._tokens.get(mcp_access_token)
-        if not google_data:
-            return None
-        return Credentials(
-            token=google_data.get("access_token"),
-            refresh_token=google_data["refresh_token"],
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=GOOGLE_CLIENT_ID,
-            client_secret=GOOGLE_CLIENT_SECRET,
-            scopes=GOOGLE_SCOPES,
-        )
-
 
 # Singleton
 token_store = TokenStore()
+
+
+def google_credentials_z_tokenu(mcp_access_token: str) -> Credentials | None:
+    """Google credentials z obsahu MCP tokenu; None, kdyz je token cizi nebo stary.
+
+    Refresh token je uvnitr zapecceneho MCP tokenu, takze k jeho ziskani neni
+    potreba zadna serverova pamet - a je jedno, ktera instance dotaz obsluhuje.
+    """
+    udaje = rozpecet(D_PRISTUP, mcp_access_token)
+    if not udaje or not udaje.get("g"):
+        return None
+    return Credentials(
+        token=None,
+        refresh_token=udaje["g"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=GOOGLE_SCOPES,
+    )
+
+
+def email_z_tokenu(mcp_access_token: str) -> str:
+    udaje = rozpecet(D_PRISTUP, mcp_access_token)
+    return (udaje or {}).get("e") or "unknown"
