@@ -95,14 +95,20 @@ https://mcp-google-workspace.sensio.cz/mcp
 
 ## Konfigurace
 
-Žádná konfigurace není potřeba. Volitelné env proměnné:
+**Pro lokální běh je povinná jedna proměnná:**
+
+| Proměnná | Účel |
+|----------|------|
+| `GOOGLE_WORKSPACE_CLIENT_SECRET` | **Povinná.** Client secret OAuth klienta. Bez ní se přihlášení ani nespustí - Google secret vyžaduje i při PKCE. Najdeš ji v [Google Cloud Console](https://console.cloud.google.com/apis/credentials) u klienta „Sensio MCP". |
+
+Volitelné:
 
 | Proměnná | Účel |
 |----------|------|
 | `GOOGLE_WORKSPACE_REFRESH_TOKEN` | Přeskočit OAuth flow (použít existující token) |
 | `GOOGLE_WORKSPACE_CLIENT_ID` | Přepsat výchozí OAuth klienta |
-| `GOOGLE_WORKSPACE_CLIENT_SECRET` | Přepsat výchozí OAuth klienta |
 | `MCP_TRANSPORT` | `streamable-http` pro Cloud Run |
+| `MCP_TOKEN_KEY` | Klíč na pečetění tokenů. **Povinný** pro `streamable-http`, viz [docs/nasazeni-a-klice.md](docs/nasazeni-a-klice.md). |
 
 ## Release Status
 

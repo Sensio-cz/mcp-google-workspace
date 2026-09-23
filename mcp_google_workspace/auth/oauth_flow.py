@@ -28,8 +28,63 @@ def _generate_pkce() -> tuple[str, str]:
     return code_verifier, code_challenge
 
 
+def sestav_auth_params(client_id: str, redirect_uri: str, code_challenge: str) -> dict:
+    """Parametry pro prihlasovaci obrazovku Googlu.
+
+    PKCE SE POSILA VZDY, i kdyz je nastaveny client secret. Puvodne se posilalo
+    bud jedno, nebo druhe: se secretem se `code_challenge` vypustil uplne, cimz
+    se zahodila obrana proti zachycenemu auth kodu prave v te vetvi, ktera
+    jedina fungovala. Google obe soucasti bez problemu prijima.
+    """
+    return {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(SCOPES),
+        "access_type": "offline",
+        "prompt": "consent",
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+    }
+
+
+def sestav_token_params(
+    code: str, client_id: str, redirect_uri: str, code_verifier: str, client_secret: str
+) -> dict:
+    """Parametry pro vymenu auth kodu za token.
+
+    `code_verifier` jde vzdy (protiklad k `code_challenge` vys). `client_secret`
+    jde jen kdyz neni prazdny - v lokalnim flow je vzdycky vyplneny, protoze bez
+    nej `run_oauth_flow()` vubec nezacne, ale funkce sama zustava pouzitelna i
+    pro klienta, kteremu by Google secret neukladal.
+    """
+    parametry = {
+        "code": code,
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+        "code_verifier": code_verifier,
+    }
+    if client_secret:
+        parametry["client_secret"] = client_secret
+    return parametry
+
+
 def run_oauth_flow() -> dict:
-    """Spusti OAuth PKCE flow - otevre prohlizec, uzivatel povoli pristup. Zadny Client Secret."""
+    """Spusti lokalni OAuth flow: otevre prohlizec a pocka na navrat s kodem.
+
+    Pouziva PKCE **i** client secret. Bez secretu se ani nezacina: Google by
+    zadost odmitl az na svem /token, a to hlaskou, ze chybi `client_secret` -
+    tedy dlouho po tom, co uzivatel proklikal prihlaseni a souhlas se scopy.
+    Radeji to rekneme hned a jmenovite.
+    """
+    if not GOOGLE_CLIENT_SECRET:
+        raise RuntimeError(
+            "Chybi GOOGLE_WORKSPACE_CLIENT_SECRET. Google u tohohle OAuth klienta "
+            "vyzaduje client secret i pri PKCE - bez nej vymena kodu za token "
+            "skonci chybou 'client_secret is missing'."
+        )
+
     code_verifier, code_challenge = _generate_pkce()
     result = {}
 
@@ -39,17 +94,13 @@ def run_oauth_flow() -> dict:
             params = urllib.parse.parse_qs(parsed.query)
 
             if "code" in params:
-                # Vymenit code za token pomoci PKCE (bez client_secret)
-                token_params = {
-                    "code": params["code"][0],
-                    "client_id": GOOGLE_CLIENT_ID,
-                    "redirect_uri": f"http://localhost:{self.server.server_address[1]}",
-                    "grant_type": "authorization_code",
-                }
-                if GOOGLE_CLIENT_SECRET:
-                    token_params["client_secret"] = GOOGLE_CLIENT_SECRET
-                else:
-                    token_params["code_verifier"] = code_verifier
+                token_params = sestav_token_params(
+                    code=params["code"][0],
+                    client_id=GOOGLE_CLIENT_ID,
+                    redirect_uri=f"http://localhost:{self.server.server_address[1]}",
+                    code_verifier=code_verifier,
+                    client_secret=GOOGLE_CLIENT_SECRET,
+                )
                 token_data = urllib.parse.urlencode(token_params).encode()
 
                 req = urllib.request.Request(
@@ -120,17 +171,7 @@ def run_oauth_flow() -> dict:
     port = server.server_address[1]
     redirect_uri = f"http://localhost:{port}"
 
-    auth_params = {
-        "client_id": GOOGLE_CLIENT_ID,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": " ".join(SCOPES),
-        "access_type": "offline",
-        "prompt": "consent",
-    }
-    if not GOOGLE_CLIENT_SECRET:
-        auth_params["code_challenge"] = code_challenge
-        auth_params["code_challenge_method"] = "S256"
+    auth_params = sestav_auth_params(GOOGLE_CLIENT_ID, redirect_uri, code_challenge)
 
     auth_url = (
         "https://accounts.google.com/o/oauth2/v2/auth?"
