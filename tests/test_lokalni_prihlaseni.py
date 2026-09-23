@@ -155,9 +155,38 @@ def test_se_secretem_jde_do_prohlizece_url_s_pkce(monkeypatch):
         "flow měl dojít až za přihlašovací obrazovku, ne spadnout na chybějícím secretu"
     )
     assert len(otevreno) == 1
-    dotaz = urllib.parse.parse_qs(urllib.parse.urlparse(otevreno[0]).query)
+    adresa = urllib.parse.urlparse(otevreno[0])
+
+    # KAM se člověk posílá přihlásit je to nejdůležitější na celé URL. Nezávislý
+    # review 23. 9. 2026 změřil, že přepsání hostitele na `accounts.example.com`
+    # prošlo všemi testy - a přitom by to poslalo souhlas se šesti scopy na cizí
+    # server. Proto se tu kontroluje host i cesta, ne jen parametry v dotazu.
+    assert adresa.scheme == "https"
+    assert adresa.netloc == "accounts.google.com"
+    assert adresa.path == "/o/oauth2/v2/auth"
+
+    dotaz = urllib.parse.parse_qs(adresa.query)
     assert dotaz["code_challenge_method"] == ["S256"]
     assert dotaz["code_challenge"][0], "PKCE musí jít ven i se secretem"
+    assert dotaz["client_id"] == [oauth_flow.GOOGLE_CLIENT_ID]
+    assert dotaz["redirect_uri"] == ["http://localhost:1234"]
+    assert dotaz["prompt"] == ["consent"], "bez toho Google refresh token nevydá znovu"
+
+    # SEZNAM SCOPŮ JE TU NAPSANÝ ZNOVU, SCHVÁLNĚ. Porovnávat ho proti
+    # `oauth_flow.SCOPES` nic neměří: změna konstanty změní obě strany zároveň
+    # (změřeno mutací 23. 9. 2026 - vypuštění gmail.send prošlo zeleně). O co
+    # uživatel žádá Google, je přitom bezpečnostní rozhodnutí: přidaný scope je
+    # tiché rozšíření oprávnění a ubraný se projeví až tím, že něco přestane
+    # fungovat. Když se seznam mění, ať se mění i tady, vědomě.
+    ocekavane_scopy = {
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.compose",
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/spreadsheets",
+    }
+    assert set(dotaz["scope"][0].split()) == ocekavane_scopy
 
 
 def test_pri_vymene_kodu_odejde_verifier_patrici_k_vyzve(monkeypatch):
@@ -186,6 +215,7 @@ def test_pri_vymene_kodu_odejde_verifier_patrici_k_vyzve(monkeypatch):
     def falesny_urlopen(req, *a, **kw):
         telo["adresa"] = req.full_url
         telo["data"] = req.data.decode()
+        telo["hlavicky"] = dict(req.headers)
         return FalesnaOdpoved()
 
     monkeypatch.setattr(oauth_flow, "GOOGLE_CLIENT_SECRET", "secret-klienta")
@@ -197,8 +227,15 @@ def test_pri_vymene_kodu_odejde_verifier_patrici_k_vyzve(monkeypatch):
 
     assert vysledek["refresh_token"] == "obnovovaci-token"
     assert telo["adresa"] == "https://oauth2.googleapis.com/token"
+    assert telo["hlavicky"].get("Content-type") == "application/x-www-form-urlencoded", (
+        "bez té hlavičky Google tělo vůbec nerozebere"
+    )
 
     poslano = urllib.parse.parse_qs(telo["data"])
+    assert poslano["client_id"] == [oauth_flow.GOOGLE_CLIENT_ID]
+    assert poslano["redirect_uri"] == ["http://localhost:1234"], (
+        "redirect_uri musí sedět na ten z přihlašovací obrazovky, jinak invalid_grant"
+    )
     vyzva = urllib.parse.parse_qs(urllib.parse.urlparse(otevreno[0]).query)["code_challenge"][0]
     verifier = poslano["code_verifier"][0]
     spocitana = base64.urlsafe_b64encode(

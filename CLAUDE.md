@@ -99,7 +99,10 @@ mcp-google-workspace/
 - `gmail_bulk_delete_messages` je záměrně zakázán (mazal natrvalo)
 - `gmail_trash` přesouvá do koše (obnovitelné 30 dní)
 - GDPR: nikdy nezveřejňovat osobní údaje v externích systémech
-- OAuth Client ID je veřejný (Desktop app), Client Secret je v kódu (standardní praxe pro desktop apps)
+- OAuth Client ID je veřejný (Desktop app). **Client Secret v kódu NENÍ** a nesmí se
+  tam vrátit: do 22. 9. 2026 tam stál jako výchozí hodnota a tenhle repozitář je
+  veřejný. Bere se z `GOOGLE_WORKSPACE_CLIENT_SECRET` a pro lokální přihlášení je
+  povinný - Google ho vyžaduje i při PKCE (změřeno 23. 9. 2026).
 
 ## Infrastruktura
 
