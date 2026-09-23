@@ -53,8 +53,10 @@ def sestav_token_params(
 ) -> dict:
     """Parametry pro vymenu auth kodu za token.
 
-    `code_verifier` jde vzdy (protiklad k `code_challenge` vys), `client_secret`
-    take - Google ho u tohohle klienta vyzaduje, viz `run_oauth_flow`.
+    `code_verifier` jde vzdy (protiklad k `code_challenge` vys). `client_secret`
+    jde jen kdyz neni prazdny - v lokalnim flow je vzdycky vyplneny, protoze bez
+    nej `run_oauth_flow()` vubec nezacne, ale funkce sama zustava pouzitelna i
+    pro klienta, kteremu by Google secret neukladal.
     """
     parametry = {
         "code": code,

@@ -19,10 +19,11 @@ GOOGLE_CLIENT_ID = os.environ.get(
 # CLIENT SECRET SE NEZAPISUJE DO KODU. Do 22. 9. 2026 tu stala jako vychozi
 # hodnota skutecna hodnota secretu desktopoveho klienta "Sensio MCP" - a tenhle
 # repozitar je verejny, takze byla od 20. 3. 2026 na ocich komukoliv. U
-# desktopoveho (installed) klienta ji Google za tajemstvi nepovazuje a PKCE ji
-# nepotrebuje (viz komentar u GOOGLE_CLIENT_ID vys), presto nema v kodu co delat.
+# desktopoveho (installed) klienta ji Google za tajemstvi nepovazuje, presto
+# nema v kodu co delat.
 #
-# Produkcni web klient na Cloud Runu bere secret z prostredi uz ted; prazdna
-# hodnota je proto v poradku pro lokalni PKCE beh a chybu nahlasi az ten, kdo
-# secret opravdu potrebuje (vymena Google auth kodu v server.py).
+# PRAZDNA HODNOTA NENI PROVOZUSCHOPNY STAV. Drive tu stalo, ze pro lokalni PKCE
+# beh je v poradku; neni - Google secret vyzaduje i pri PKCE (mereni u
+# GOOGLE_CLIENT_ID vys). Lokalni prihlaseni proto bez teto promenne odmitne
+# zacit (auth/oauth_flow.py) a vzdaleny beh na Cloud Runu ji bere z prostredi.
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_WORKSPACE_CLIENT_SECRET", "")

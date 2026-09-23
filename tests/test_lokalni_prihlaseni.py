@@ -19,6 +19,8 @@ Spuštění: python -m pytest tests/test_lokalni_prihlaseni.py -q
 
 import base64
 import hashlib
+import io
+import json
 import urllib.parse
 
 import pytest
@@ -46,6 +48,29 @@ class FalesnyServer:
 
     def server_close(self):
         pass
+
+
+class ServerKteryVratiKod(FalesnyServer):
+    """Projde celým callbackem: zavolá `do_GET()` s hotovým auth kódem.
+
+    Bez tohohle se obsluha callbacku vůbec nespustí a žádné tvrzení nesáhne na
+    tělo žádosti o token. Nezávislý review 23. 9. 2026 to změřil: mutace
+    `code_verifier=code_verifier` na `code_verifier="incorrect-verifier"`
+    prošla všemi šesti testy, přestože by rozbila přihlášení.
+    """
+
+    def __init__(self, adresa, obsluha):
+        self.obsluha = obsluha
+
+    def handle_request(self):
+        h = self.obsluha.__new__(self.obsluha)
+        h.path = "/?code=auth-kod-z-googlu"
+        h.server = self
+        h.wfile = io.BytesIO()
+        h.send_response = lambda *a, **kw: None
+        h.send_header = lambda *a, **kw: None
+        h.end_headers = lambda: None
+        h.do_GET()
 
 
 def test_code_challenge_je_opravdu_s256_verifieru():
@@ -133,3 +158,53 @@ def test_se_secretem_jde_do_prohlizece_url_s_pkce(monkeypatch):
     dotaz = urllib.parse.parse_qs(urllib.parse.urlparse(otevreno[0]).query)
     assert dotaz["code_challenge_method"] == ["S256"]
     assert dotaz["code_challenge"][0], "PKCE musí jít ven i se secretem"
+
+
+def test_pri_vymene_kodu_odejde_verifier_patrici_k_vyzve(monkeypatch):
+    """Verifier v žádosti o token musí sedět na challenge poslanou do prohlížeče.
+
+    Dvě půlky PKCE spolu drží jen tím, že jsou z jednoho páru. Kdyby se do
+    výměny dostal jiný řetězec, Google odpoví `invalid_grant` a přihlášení
+    skončí - a všechna ostatní tvrzení tady by přesto prošla, protože se na
+    tělo té žádosti nikdy nepodívají.
+    """
+    otevreno = []
+    telo = {}
+
+    class FalesnaOdpoved:
+        def read(self):
+            return json.dumps(
+                {"refresh_token": "obnovovaci-token", "access_token": "pristupovy-token"}
+            ).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def falesny_urlopen(req, *a, **kw):
+        telo["adresa"] = req.full_url
+        telo["data"] = req.data.decode()
+        return FalesnaOdpoved()
+
+    monkeypatch.setattr(oauth_flow, "GOOGLE_CLIENT_SECRET", "secret-klienta")
+    monkeypatch.setattr(oauth_flow.http.server, "HTTPServer", ServerKteryVratiKod)
+    monkeypatch.setattr(oauth_flow.webbrowser, "open", lambda url: otevreno.append(url))
+    monkeypatch.setattr(oauth_flow.urllib.request, "urlopen", falesny_urlopen)
+
+    vysledek = oauth_flow.run_oauth_flow()
+
+    assert vysledek["refresh_token"] == "obnovovaci-token"
+    assert telo["adresa"] == "https://oauth2.googleapis.com/token"
+
+    poslano = urllib.parse.parse_qs(telo["data"])
+    vyzva = urllib.parse.parse_qs(urllib.parse.urlparse(otevreno[0]).query)["code_challenge"][0]
+    verifier = poslano["code_verifier"][0]
+    spocitana = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode("ascii")).digest()
+    ).rstrip(b"=").decode("ascii")
+
+    assert spocitana == vyzva, "verifier nepatří k challenge, kterou dostal Google"
+    assert poslano["client_secret"] == ["secret-klienta"]
+    assert poslano["code"] == ["auth-kod-z-googlu"]
