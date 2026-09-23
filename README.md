@@ -11,6 +11,8 @@ MCP server pro Google Workspace (Gmail, Drive, Sheets) s automatickým OAuth flo
 - **Google Drive**: search, read, upload, create folders, delete
 - **Google Sheets**: read, write, append, clear, add/delete sheets
 - **Google Calendar**: list/create/patch/delete událostí, výpis a hledání místností
+  (**pozor:** přihlašovací flow zatím o Calendar oprávnění nežádá, takže nově
+  přihlášený uživatel tyhle nástroje nerozjede - viz `SCOPES` v `auth/oauth_flow.py`)
 - **Auto OAuth**: při prvním použití se otevře prohlížeč pro Google přihlášení
 - **Multi-user**: každý uživatel se přihlásí svým účtem (Cloud Run remote)
 - **Reply fix**: správně zpracovává diakritiku v hlavičkách emailů
@@ -34,6 +36,11 @@ Přidejte do `.mcp.json`:
 
 Server spouští MCP klient, ne vy, takže proměnná patří sem do `env` - export
 v shellu se k němu nemusí dostat.
+
+`"command": "mcp-google-workspace"` počítá s tím, že server je nainstalovaný
+v `PATH`. Při vývoji z checkoutu (`uv sync`) leží spustitelný soubor v `.venv`,
+takže uveďte celou cestu, nebo použijte `"command": "uv"` s
+`"args": ["run", "--project", "/cesta/k/mcp-google-workspace", "mcp-google-workspace"]`.
 
 **Nejdřív nastavte `GOOGLE_WORKSPACE_CLIENT_SECRET`** (viz [Konfigurace](#konfigurace)).
 Bez ní přihlášení skončí hned výjimkou - Google client secret vyžaduje i při PKCE.
