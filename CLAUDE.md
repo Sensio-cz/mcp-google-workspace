@@ -116,17 +116,25 @@ mcp-google-workspace/
 - Region: europe-west1
 - URL: https://mcp-google-workspace-581084999054.europe-west1.run.app
 - Doména: https://mcp-google-workspace.sensio.cz
-- **Nasazuje se RUČNĚ. Žádný auto-deploy neexistuje.** Do 23. 9. 2026 tu stálo
-  „push na master → Cloud Build → Cloud Run"; změřeno to neplatí -
-  `gcloud builds triggers list` je prázdný a merge PR #4 se nenasadil.
-  Zmergovat tedy **nestačí**, je potřeba:
+- **Merge do `master` = nasazení na produkci.** Cloud Build trigger
+  `cloudrun-mcp-google-workspace-europe-west1-Sensio-cz-mcp-gookmz` (region
+  **europe-west1**, od 20. 3. 2026) po každém pushi do `master` sestaví image
+  a nasadí novou revizi. Změřeno 26. 9. 2026: merge PR #8 v 11:12:21 UTC,
+  build 11:12:25, revize `00037` v 11:13:55. Stejně se sestavil i merge PR #4
+  (23. 9. 00:04 UTC).
+  Od 23. do 26. 9. 2026 tu stálo, že auto-deploy neexistuje - `gcloud builds
+  triggers list` **bez `--region`** hledá jen globální triggery a regionální
+  nevidí. Při kontrole proto vždy s regionem:
 
   ```bash
-  gcloud run deploy mcp-google-workspace --source .     --region europe-west1 --project mzdy-487615
+  gcloud builds triggers list --region europe-west1 --project mzdy-487615
+  gcloud builds list --region europe-west1 --project mzdy-487615 --limit 5
   ```
 
   Ověř pak, že běží nová revize: `gcloud run revisions list --service
-  mcp-google-workspace --region europe-west1 --project mzdy-487615 --limit 3`
+  mcp-google-workspace --region europe-west1 --project mzdy-487615 --limit 3`.
+  Ruční `gcloud run deploy mcp-google-workspace --source . --region
+  europe-west1 --project mzdy-487615` je jen nouzová cesta (trigger nefunguje).
 
 ### OAuth
 - Desktop klient: pro lokální použití. PKCE **i** client secret - Google secret

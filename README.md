@@ -62,8 +62,9 @@ Client secret pro vývoj najdete v [Google Cloud Console](https://console.cloud.
 u klienta „Sensio MCP" (projekt `mzdy-487615`). **Nikam ho nezapisujte v repu** -
 do 22. 9. 2026 stál jako výchozí hodnota v `config.py` a tenhle repozitář je veřejný.
 
-**Nasazení není automatické.** Merge do `master` nic nenasadí; po merge je potřeba
-pustit deploy ručně, postup je v `CLAUDE.md`.
+**Merge do `master` je nasazení na produkci.** Cloud Build trigger v regionu
+europe-west1 po každém pushi do `master` sestaví a nasadí novou revizi. Podrobnosti
+a kontrola v `CLAUDE.md`.
 
 ## Cloud Run (remote)
 
