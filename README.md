@@ -94,7 +94,7 @@ https://mcp-google-workspace.sensio.cz/mcp
 | `create_gmail_draft` | Vytvoř draft s automatickým podpisem |
 | `delete_gmail_draft` | Smaž draft |
 | `gmail_send_draft` | Odešli existující draft |
-| `gmail_reply_to_email` | Odpověz ve vláknu (draft nebo send) |
+| `gmail_reply_to_email` | Odpověz ve vláknu (draft nebo send); `to` přepíše adresáta, např. u mailu z webového formuláře |
 | `gmail_send_email` | Odešli email přímo |
 | `gmail_mark_as_read` | Označ jako přečtené |
 | `gmail_mark_as_unread` | Označ jako nepřečtené |

@@ -41,6 +41,16 @@ mcp = FastMCP(
     name="mcp-google-workspace",
     host="0.0.0.0",
     port=int(os.environ.get("PORT", "8080")),
+    # BEZSTAVOVY REZIM, JINAK NASTROJE VIDI TOKEN Z PRVNIHO POZADAVKU RELACE.
+    # Ve stavovem rezimu SDK spusti zpracovani relace v uloze zalozene prvnim
+    # pozadavkem a `get_access_token()` pak vraci jeho token, ne token
+    # aktualniho pozadavku. Klient po hodine token obnovi, middleware novy
+    # prijme, ale nastroj dal cte ten puvodni - uz propadly - a konci hlaskou
+    # "Tenhle MCP token nenese Google pristup". Zmereno 26. 9. 2026: v jedne
+    # relaci poslan token 1 a pak token 2, nastroj videl dvakrat token 1.
+    # Server zadny stav relace nepotrebuje (nastroje jsou request/response),
+    # takze bezstavovy rezim nic nebere.
+    stateless_http=True,
     auth_server_provider=oauth_provider,
     auth=AuthSettings(
         issuer_url=SERVER_URL,

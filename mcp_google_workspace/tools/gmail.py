@@ -61,9 +61,14 @@ async def gmail_reply_to_email(
     reply_body: str,
     send: bool = False,
     reply_all: bool = False,
+    to: str | None = None,
 ) -> dict[str, Any]:
-    """Odpovez na email ve vlaknu. Default: vytvori draft (send=False). Automaticky prida podpis a zachova vlakno."""
-    return _get_gmail().reply_to_email(email_id, reply_body, send=send, reply_all=reply_all)
+    """Odpovez na email ve vlaknu. Default: vytvori draft (send=False). Automaticky prida podpis a zachova vlakno.
+
+    to: volitelny adresat misto odesilatele puvodniho mailu. Pouzij u mailu
+    z webovych formularu, kde je odesilatel formular a adresa zakaznika jen v tele.
+    """
+    return _get_gmail().reply_to_email(email_id, reply_body, send=send, reply_all=reply_all, to=to)
 
 
 @mcp.tool()
