@@ -4,6 +4,21 @@ Všechny podstatné změny v projektu mcp-google-workspace.
 
 Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] - 26. 9. 2026
+
+### Opraveno
+- **Nástroje po hodině přestaly fungovat s hláškou „Tenhle MCP token nenese Google přístup“**,
+  i když konektor svítil jako připojený. Ve stavovém režimu streamable HTTP viděly nástroje
+  token z prvního požadavku relace, ne z aktuálního. Po hodinové obnově tokenu tak četly
+  propadlý token. Server teď běží bezstavově (`stateless_http=True`). Změřeno 26. 9. 2026
+  na produkci (dvakrát) i reprodukcí; test `tests/test_token_aktualniho_pozadavku.py`.
+- **Podpis jiného uživatele v odeslaných mailech.** Podpis se cachoval pod jedním klíčem
+  pro celý server; teď se čte pro přihlášeného uživatele při každém odeslání.
+
+### Přidáno
+- `gmail_reply_to_email` má volitelný parametr `to`: odpověď zůstane ve vlákně, ale jde
+  na zadanou adresu. Pro maily z webových formulářů, kde je odesílatelem formulář.
+
 ## [0.3.0] - 29. 4. 2026
 
 ### Přidáno

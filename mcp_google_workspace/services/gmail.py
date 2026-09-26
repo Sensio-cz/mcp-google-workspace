@@ -8,8 +8,11 @@ from ..auth.context import get_current_google_credentials
 
 
 class GmailService:
-    def __init__(self):
-        self._signature_cache: dict[str, str] = {}
+    # PODPIS SE NECACHUJE. Instance je jedna pro cely server a slouzi vsem
+    # prihlasenym uzivatelum; cache pod klicem "primary" tak vracela podpis
+    # toho, kdo na instanci poslal mail jako prvni - a jeho podpis se pak
+    # vkladal do mailu ostatnich uctu (nalez 26. 9. 2026 pri napojeni druhe
+    # schranky). Jedno volani API navic na odeslanou zpravu je levne.
 
     @property
     def service(self):
@@ -20,14 +23,12 @@ class GmailService:
     # --- Podpis ---
 
     def get_signature(self) -> str:
-        """Nacte HTML podpis z Gmail settings."""
-        if "primary" not in self._signature_cache:
-            sendas = self.service.users().settings().sendAs().list(userId="me").execute()
-            for sa in sendas.get("sendAs", []):
-                if sa.get("isPrimary"):
-                    self._signature_cache["primary"] = sa.get("signature", "")
-                    break
-        return self._signature_cache.get("primary", "")
+        """Nacte HTML podpis prihlaseneho uzivatele z Gmail settings."""
+        sendas = self.service.users().settings().sendAs().list(userId="me").execute()
+        for sa in sendas.get("sendAs", []):
+            if sa.get("isPrimary"):
+                return sa.get("signature", "")
+        return ""
 
     # --- Query ---
 
@@ -172,13 +173,20 @@ class GmailService:
         send: bool = False,
         reply_all: bool = False,
         include_signature: bool = True,
+        to: str | None = None,
     ) -> dict:
-        """Odpovez na email - jako draft nebo rovnou odesli. Vzdy ve vlaknu."""
+        """Odpovez na email - jako draft nebo rovnou odesli. Vzdy ve vlaknu.
+
+        `to` PREPISE ADRESATA, VLAKNO ZUSTANE. Maily z webovych formularu maji
+        odesilatele formulare (napr. web@mycello.cz) a adresu zakaznika jen
+        v tele. Odpoved na `from` by pak sla zpatky formulari a zakaznik by
+        nedostal nic (stalo se 26. 9. 2026).
+        """
         original = self.get_email_by_id(email_id)
         if not original:
             return {"error": True, "message": "Email nenalezen"}
 
-        to = original["from"]
+        to = to or original["from"]
         cc = None
         if reply_all:
             cc_parts = []

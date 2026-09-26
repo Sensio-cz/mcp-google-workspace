@@ -46,7 +46,7 @@ mcp-google-workspace/
 | `create_gmail_draft` | Vytvoř draft s podpisem |
 | `delete_gmail_draft` | Smaž draft |
 | `gmail_send_draft` | Odešli draft |
-| `gmail_reply_to_email` | Odpověz ve vláknu (draft/send) |
+| `gmail_reply_to_email` | Odpověz ve vláknu (draft/send), volitelně na jinou adresu (`to`) |
 | `gmail_send_email` | Odešli email přímo |
 | `gmail_mark_as_read` | Označ jako přečtené |
 | `gmail_mark_as_unread` | Označ jako nepřečtené |
