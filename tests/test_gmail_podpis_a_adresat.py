@@ -69,3 +69,28 @@ def test_bez_adresy_se_odpovida_odesilateli():
         sluzba.reply_to_email("e1", "Dobrý den", send=True)
     _, zprava = _odeslana_zprava(api)
     assert zprava["To"] == "zakaznik@example.com"
+
+
+def test_neplatny_adresat_je_chyba_ne_koncept_bez_prijemce():
+    sluzba = GmailService()
+    api = _gmail_s_podpisem("")
+    with patch.object(GmailService, "service", new=api), \
+         patch.object(GmailService, "get_email_by_id", return_value=_puvodni("MyCello <web@mycello.cz>")):
+        for spatne in ("a@x.cz, b@y.cz", "a@x.cz\r\nBcc: utocnik@x.cz"):
+            vysledek = sluzba.reply_to_email("e1", "Text", to=spatne)
+            assert vysledek.get("error") is True
+    api.users().drafts().create.assert_not_called()
+
+
+def test_reply_all_s_adresatem_ho_neda_i_do_kopie():
+    sluzba = GmailService()
+    api = _gmail_s_podpisem("")
+    puvodni = {**_puvodni("MyCello <web@mycello.cz>"), "cc": "Zakaznice <zakaznice@example.fr>, kolega@mycello.cz"}
+    with patch.object(GmailService, "service", new=api), \
+         patch.object(GmailService, "get_email_by_id", return_value=puvodni), \
+         patch.object(GmailService, "_get_my_email", return_value="info@mycello.cz"):
+        sluzba.reply_to_email("e1", "Text", send=True, reply_all=True, to="zakaznice@example.fr")
+    _, zprava = _odeslana_zprava(api)
+    assert zprava["To"] == "zakaznice@example.fr"
+    assert "zakaznice@example.fr" not in zprava["Cc"]
+    assert "kolega@mycello.cz" in zprava["Cc"]

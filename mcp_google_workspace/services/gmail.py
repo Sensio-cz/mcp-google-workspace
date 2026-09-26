@@ -186,7 +186,17 @@ class GmailService:
         if not original:
             return {"error": True, "message": "Email nenalezen"}
 
-        to = to or original["from"]
+        if to is not None:
+            # PRAZDNY ADRESAT JE CHYBA, NE KONCEPT BEZ PRIJEMCE. `parseaddr`
+            # vrati prazdny retezec pro dve adresy nebo CR/LF a zprava by
+            # vznikla bez To - nastroj by pritom hlasil uspech.
+            if not self._safe_to_header(to):
+                return {
+                    "error": True,
+                    "message": f"Neplatny adresat '{to}'. Zadej prave jednu e-mailovou adresu.",
+                }
+        else:
+            to = original["from"]
         cc = None
         if reply_all:
             cc_parts = []
@@ -195,7 +205,11 @@ class GmailService:
             if original["to"]:
                 cc_parts.extend([a.strip() for a in original["to"].split(",")])
             my_email = self._get_my_email()
-            cc = [a for a in cc_parts if my_email not in a] or None
+            _, adresat = parseaddr(to)
+            cc = [
+                a for a in cc_parts
+                if my_email not in a and parseaddr(a)[1].lower() != adresat.lower()
+            ] or None
 
         subject = original["subject"]
         if not subject.lower().startswith("re:"):

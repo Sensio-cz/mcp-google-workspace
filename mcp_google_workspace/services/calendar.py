@@ -20,7 +20,7 @@ from typing import Any, Optional
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from ..auth.context import get_current_google_credentials
+from ..auth.context import current_user_key, get_current_google_credentials
 
 
 # ---------------------------------------------------------------------------
@@ -455,7 +455,11 @@ class CalendarService:
         Vyžaduje DwD scope `https://www.googleapis.com/auth/admin.directory.resource.calendar.readonly`.
         Pokud scope chybí, vrací prázdný seznam (graceful degradation).
         """
-        cache_key = "all"
+        # KLIC JE UZIVATEL, NE "all". Cache je na urovni tridy a sdili ji vsichni
+        # prihlaseni; pod pevnym klicem dostal kazdy mistnosti toho, kdo se
+        # zeptal prvni - i uzivatel z jine domeny nebo bez prav do Directory
+        # (nalez revize 26. 9. 2026).
+        cache_key = current_user_key()
         now = time.time()
         if not force_refresh and cache_key in self._rooms_cache:
             cached_at, rooms = self._rooms_cache[cache_key]

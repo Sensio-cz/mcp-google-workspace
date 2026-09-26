@@ -15,6 +15,19 @@ from .credentials import get_google_credentials as get_fallback_credentials
 logger = logging.getLogger(__name__)
 
 
+def current_user_key() -> str:
+    """Kdo je prihlaseny - klic pro cache s daty konkretniho uzivatele.
+
+    Instance sluzeb je jedna pro cely server, takze cokoli cachovaneho bez
+    tohoto klice se ukaze i ostatnim uzivatelum. Lokalni stdio beh nema MCP
+    token a je jednouzivatelsky, proto "local".
+    """
+    access_token = get_access_token()
+    if access_token:
+        return email_z_tokenu(access_token.token)
+    return "local"
+
+
 def get_current_google_credentials() -> Credentials:
     """
     Get Google credentials for the current authenticated MCP user.
