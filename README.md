@@ -11,8 +11,8 @@ MCP server pro Google Workspace (Gmail, Drive, Sheets) s automatickým OAuth flo
 - **Google Drive**: search, read, upload, create folders, delete
 - **Google Sheets**: read, write, append, clear, add/delete sheets
 - **Google Calendar**: list/create/patch/delete událostí, výpis a hledání místností
-  (**pozor:** přihlašovací flow zatím o Calendar oprávnění nežádá, takže nově
-  přihlášený uživatel tyhle nástroje nerozjede - viz `SCOPES` v `auth/oauth_flow.py`)
+  (scope `calendar.events` od 0.3.2; uživatel přihlášený dřív se musí přihlásit znovu,
+  jinak nástroje `calendar_*` vracejí 403 insufficientPermissions)
 - **Auto OAuth**: při prvním použití se otevře prohlížeč pro Google přihlášení
 - **Multi-user**: každý uživatel se přihlásí svým účtem (Cloud Run remote)
 - **Reply fix**: správně zpracovává diakritiku v hlavičkách emailů
