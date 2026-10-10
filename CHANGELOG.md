@@ -4,6 +4,16 @@ Všechny podstatné změny v projektu mcp-google-workspace.
 
 Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
 
+## [0.3.3] - 10. 10. 2026
+
+### Opraveno
+- **Po 0.3.2 přestala fungovat všechna starší přihlášení** (`invalid_scope: Bad Request` při
+  obnově Google tokenu, změřeno na konektoru `mycello-podpora` 10. 10. 2026 11:20). Příčina:
+  `google_credentials_z_tokenu` dávalo do `Credentials` celý seznam `GOOGLE_SCOPES`, google-auth
+  ho při obnově posílá jako `scope=` a Google odmítne, když původní souhlas ten rozsah nemá.
+  Teď `scopes=None`: obnovený token nese rozsah původního souhlasu, chybějící scope se projeví
+  až 403 u konkrétního nástroje (a vyřeší nové přihlášení). Test `tests/test_obnova_bez_scope.py`.
+
 ## [0.3.2] - 10. 10. 2026
 
 ### Opraveno
