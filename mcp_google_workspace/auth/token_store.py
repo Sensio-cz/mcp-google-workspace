@@ -159,13 +159,18 @@ def google_credentials_z_tokenu(mcp_access_token: str) -> Credentials | None:
     udaje = rozpecet(D_PRISTUP, mcp_access_token)
     if not udaje or not udaje.get("g"):
         return None
+    # scopes=None schvalne (0.3.3): s vyplnenymi scopes posila google-auth pri obnove `scope=...`
+    # a Google vrati `invalid_scope`, kdyz puvodni souhlas ten rozsah nemel. Po pridani
+    # calendar.events (0.3.2) tak 10. 10. 2026 prestaly fungovat vsechny starsi prihlaseni
+    # (zmereno: mycello-podpora, `invalid_scope: Bad Request`). Obnoveny token nese rozsah
+    # puvodniho souhlasu; chybejici scope se projevi az 403 u konkretniho nastroje.
     return Credentials(
         token=None,
         refresh_token=udaje["g"],
         token_uri="https://oauth2.googleapis.com/token",
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
-        scopes=GOOGLE_SCOPES,
+        scopes=None,
     )
 
 
