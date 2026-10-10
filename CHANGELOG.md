@@ -4,6 +4,17 @@ Všechny podstatné změny v projektu mcp-google-workspace.
 
 Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
 
+## [0.3.2] - 10. 10. 2026
+
+### Opraveno
+- **Nástroje `calendar_*` vracely 403 „Request had insufficient authentication scopes“** pro
+  každého uživatele přihlášeného přes server: přihlašovací flow žádalo jen Gmail, Drive a
+  Sheets, kalendářový scope chyběl (README to od 23. 9. přiznávalo). Přidán
+  `https://www.googleapis.com/auth/calendar.events` (služba volá jen `events().*`; místnosti
+  jdou dál přes DwD Directory scope). Změřeno 10. 10. 2026 na produkci účtem jan.tobolik@sensio.cz
+  (403 před změnou i po novém přihlášení). **Po nasazení se musí každý uživatel přihlásit
+  znovu** (`/mcp` → Authenticate), aby token nový scope nesl.
+
 ## [0.3.1] - 26. 9. 2026
 
 ### Opraveno

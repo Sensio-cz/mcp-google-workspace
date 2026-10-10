@@ -185,6 +185,9 @@ def test_se_secretem_jde_do_prohlizece_url_s_pkce(monkeypatch):
         "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/drive",
         "https://www.googleapis.com/auth/spreadsheets",
+        # 10. 10. 2026: kalendar (jen udalosti; sluzba vola pouze events().*). Do te doby
+        # nastroje calendar_* po prihlaseni vracely 403 insufficientPermissions.
+        "https://www.googleapis.com/auth/calendar.events",
     }
     assert set(dotaz["scope"][0].split()) == ocekavane_scopy
 
