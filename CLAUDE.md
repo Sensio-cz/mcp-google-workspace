@@ -35,7 +35,7 @@ mcp-google-workspace/
 └── README.md                 # Dokumentace, tools inventář
 ```
 
-## Tools inventář (35 aktivních: 16 Gmail + 6 Drive + 7 Sheets + 6 Calendar)
+## Tools inventář (36 aktivních: 16 Gmail + 7 Drive + 7 Sheets + 6 Calendar)
 
 ### Gmail (16)
 | Tool | Popis |
