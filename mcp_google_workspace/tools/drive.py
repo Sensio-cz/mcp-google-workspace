@@ -37,6 +37,15 @@ async def drive_upload_file(filename: str, content_base64: str, parent_folder_id
 
 
 @mcp.tool()
+async def drive_update_file_content(
+    file_id: str, content: str, content_mime_type: str = "text/html", encoding: str = "utf-8"
+) -> dict[str, Any]:
+    """Prepis obsah existujiciho souboru na Google Drive; ID souboru i odkaz zustavaji.
+    U Google dokumentu se nahrane HTML nebo text prevede a nahradi cely dokument (predchozi
+    obsah zustane v historii verzi). encoding: 'utf-8' (content je text) nebo 'base64'."""
+    return _get_drive().update_file_content(file_id, content, content_mime_type, encoding)
+
+@mcp.tool()
 async def drive_delete_file(file_id: str) -> dict[str, Any]:
     """Smaz soubor z Google Drive."""
     return _get_drive().delete_file(file_id)

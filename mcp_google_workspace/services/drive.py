@@ -80,6 +80,44 @@ class DriveService:
             supportsAllDrives=True,
         ).execute()
 
+    def update_file_content(
+        self,
+        file_id: str,
+        content: str,
+        content_mime_type: str = "text/html",
+        encoding: str = "utf-8",
+    ) -> dict:
+        """Prepise obsah existujiciho souboru; ID souboru i odkaz zustavaji.
+
+        U souboru Google (Docs, Sheets, Slides) Drive nahrany obsah prevede (HTML, text,
+        CSV, docx...) a nahradi jim cely dokument. Predchozi obsah zustane v historii verzi
+        dokumentu, takze jde vratit. Bez tohoto nastroje slo upravit jen metadata; kazda
+        zmena obsahu znamenala novy soubor a novy odkaz.
+        """
+        if encoding == "base64":
+            data = base64.b64decode(content, validate=True)
+        elif encoding == "utf-8":
+            data = content.encode("utf-8")
+        else:
+            raise ValueError(f"Nepodporovane encoding: {encoding!r} (povolene: 'utf-8', 'base64')")
+        if not data:
+            raise ValueError("Prazdny obsah: prepsat soubor prazdnym obsahem neni dovoleno")
+
+        # supportsAllDrives i tady - bez nej vraci files().get na sdilene soubory 404.
+        meta = self.service.files().get(
+            fileId=file_id, fields="id, name, mimeType", supportsAllDrives=True
+        ).execute()
+        if meta.get("mimeType") == "application/vnd.google-apps.folder":
+            return {"error": True, "message": f"'{meta.get('name')}' je slozka, obsah lze prepsat jen souboru"}
+
+        media = MediaIoBaseUpload(io.BytesIO(data), mimetype=content_mime_type, resumable=False)
+        return self.service.files().update(
+            fileId=file_id,
+            media_body=media,
+            fields="id,name,mimeType,modifiedTime,version,webViewLink",
+            supportsAllDrives=True,
+        ).execute()
+
     def delete_file(self, file_id: str) -> dict:
         self.service.files().delete(fileId=file_id, supportsAllDrives=True).execute()
         return {"success": True}
