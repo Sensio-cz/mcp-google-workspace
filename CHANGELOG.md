@@ -4,6 +4,16 @@ Všechny podstatné změny v projektu mcp-google-workspace.
 
 Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 15. 10. 2026
+
+### Přidáno
+- **`drive_update_file_content`** - přepis obsahu existujícího souboru na Drive přes
+  `files().update` s media uploadem. ID souboru i odkaz zůstávají; u Google dokumentu
+  Drive nahrané HTML nebo text převede a nahradí celý dokument, předchozí obsah zůstane
+  v historii verzí. Dosud šlo obsah jen nahrát jako nový soubor (`drive_upload_file`),
+  takže každá úprava Google dokumentu znamenala nový soubor a nový odkaz (15. 10. 2026,
+  nájemní smlouva MyCello). Složku odmítne, prázdný obsah a neznámé `encoding` končí chybou.
+
 ## [0.3.3] - 10. 10. 2026
 
 ### Opraveno

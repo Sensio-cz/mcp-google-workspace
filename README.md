@@ -114,6 +114,7 @@ https://mcp-google-workspace.sensio.cz/mcp
 | `drive_read_file_content` | Přečti obsah (Docs - markdown, Sheets - CSV) |
 | `drive_create_folder` | Vytvoř složku |
 | `drive_upload_file` | Nahraj soubor (base64) |
+| `drive_update_file_content` | Přepiš obsah existujícího souboru (ID a odkaz zůstávají; u Google dokumentu převede HTML/text) |
 | `drive_delete_file` | Smaž soubor |
 | `drive_list_shared_drives` | Vypiš sdílené disky |
 

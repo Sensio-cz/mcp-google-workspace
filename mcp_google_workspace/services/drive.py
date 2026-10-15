@@ -80,6 +80,85 @@ class DriveService:
             supportsAllDrives=True,
         ).execute()
 
+    # Google typy, do kterych Drive umi nahrany obsah naimportovat (HTML/text/CSV/docx...).
+    _IMPORTOVATELNE_GOOGLE_TYPY = {
+        "application/vnd.google-apps.document",
+        "application/vnd.google-apps.spreadsheet",
+        "application/vnd.google-apps.presentation",
+    }
+    _LIMIT_JEDNODUCHEHO_UPLOADU = 5 * 1024 * 1024  # nad 5 MB chce Google resumable upload
+
+    def update_file_content(
+        self,
+        file_id: str,
+        content: str,
+        content_mime_type: str = "text/html",
+        encoding: str = "utf-8",
+        allow_type_change: bool = False,
+        expected_modified_time: str | None = None,
+    ) -> dict:
+        """Prepise obsah existujiciho souboru; ID souboru i odkaz zustavaji.
+
+        U souboru Google (Docs, Sheets, Slides) Drive nahrany obsah prevede (HTML, text,
+        CSV, docx...) a nahradi jim cely dokument. Predchozi obsah zustane v historii verzi
+        dokumentu, takze jde vratit. Bez tohoto nastroje slo upravit jen metadata; kazda
+        zmena obsahu znamenala novy soubor a novy odkaz.
+
+        Pojistky (nalezy revize 15. 10. 2026): u jinych Google typu (slozka, zkratka,
+        formular...) se nic neprepise; u obycejneho souboru (PDF, obrazek...) musi
+        content_mime_type odpovidat typu souboru, jinak by vychozi text/html prepsal
+        binarni soubor HTML - prepsani jinym typem jde jen s allow_type_change=True.
+        expected_modified_time (RFC 3339 z files().get) chrani pred tichym prepsanim
+        upravy, kterou mezitim udelal nekdo jiny.
+        """
+        if encoding == "base64":
+            # MIME styl base64 ma odradkovani po 76 znacich; validate=True by ho odmitl.
+            data = base64.b64decode("".join(content.split()), validate=True)
+        elif encoding == "utf-8":
+            data = content.encode("utf-8")
+        else:
+            raise ValueError(f"Nepodporovane encoding: {encoding!r} (povolene: 'utf-8', 'base64')")
+        if not data:
+            raise ValueError("Prazdny obsah: prepsat soubor prazdnym obsahem neni dovoleno")
+
+        # supportsAllDrives i tady - bez nej vraci files().get na sdilene soubory 404.
+        meta = self.service.files().get(
+            fileId=file_id, fields="id, name, mimeType, modifiedTime, version", supportsAllDrives=True
+        ).execute()
+        typ = meta.get("mimeType") or ""
+        nazev = meta.get("name")
+        if typ.startswith("application/vnd.google-apps."):
+            if typ not in self._IMPORTOVATELNE_GOOGLE_TYPY:
+                return {
+                    "error": True,
+                    "message": f"'{nazev}' je {typ}, obsah lze prepsat jen u Google dokumentu, tabulky nebo prezentace",
+                }
+        elif content_mime_type != typ and not allow_type_change:
+            return {
+                "error": True,
+                "message": f"'{nazev}' je {typ}, ale nahravany obsah je {content_mime_type}; "
+                           "pro zmenu typu souboru zavolej znovu s allow_type_change=True",
+            }
+        if expected_modified_time and meta.get("modifiedTime") != expected_modified_time:
+            return {
+                "error": True,
+                "message": f"'{nazev}' byl mezitim zmenen ({meta.get('modifiedTime')}, ocekavano {expected_modified_time}); "
+                           "precti ho znovu a zapis zopakuj",
+            }
+
+        media = MediaIoBaseUpload(
+            io.BytesIO(data), mimetype=content_mime_type,
+            resumable=len(data) > self._LIMIT_JEDNODUCHEHO_UPLOADU,
+        )
+        vysledek = self.service.files().update(
+            fileId=file_id,
+            media_body=media,
+            fields="id,name,mimeType,modifiedTime,version,webViewLink",
+            supportsAllDrives=True,
+        ).execute()
+        vysledek["previous"] = {k: meta.get(k) for k in ("name", "mimeType", "modifiedTime", "version")}
+        return vysledek
+
     def delete_file(self, file_id: str) -> dict:
         self.service.files().delete(fileId=file_id, supportsAllDrives=True).execute()
         return {"success": True}

@@ -19,12 +19,12 @@ mcp-google-workspace/
 │   │   └── context.py       # Request context - credentials přihlášeného uživatele
 │   ├── services/
 │   │   ├── gmail.py         # GmailService - 23 metod (query, reply, draft, labels, trash...)
-│   │   ├── drive.py         # DriveService - 7 metod (search, read, upload, folder, delete)
+│   │   ├── drive.py         # DriveService - 8 metod (search, read, upload, update content, folder, delete)
 │   │   ├── sheets.py        # SheetsService - 7 metod (create, read, write, append, clear, add/delete)
 │   │   └── calendar.py      # CalendarService - události a místnosti
 │   └── tools/
 │       ├── gmail.py         # 16 Gmail tools (1 zakázán: bulk_delete)
-│       ├── drive.py         # 6 Drive tools
+│       ├── drive.py         # 7 Drive tools
 │       ├── sheets.py        # 7 Sheets tools
 │       └── calendar.py      # 6 Calendar tools
 ├── docs/nasazeni-a-klice.md  # Klíč na tokeny, adresa serveru, secret
@@ -35,7 +35,7 @@ mcp-google-workspace/
 └── README.md                 # Dokumentace, tools inventář
 ```
 
-## Tools inventář (35 aktivních: 16 Gmail + 6 Drive + 7 Sheets + 6 Calendar)
+## Tools inventář (36 aktivních: 16 Gmail + 7 Drive + 7 Sheets + 6 Calendar)
 
 ### Gmail (16)
 | Tool | Popis |
@@ -57,13 +57,14 @@ mcp-google-workspace/
 | `gmail_remove_label` | Odeber label |
 | `gmail_trash` | Přesuň do koše (obnovitelné 30 dní) |
 
-### Drive (6)
+### Drive (7)
 | Tool | Popis |
 |------|-------|
 | `drive_search_files` | Vyhledej soubory |
 | `drive_read_file_content` | Přečti obsah (Docs → markdown, Sheets → CSV) |
 | `drive_create_folder` | Vytvoř složku |
 | `drive_upload_file` | Nahraj soubor (base64) |
+| `drive_update_file_content` | Přepiš obsah existujícího souboru (ID a odkaz zůstávají) |
 | `drive_delete_file` | Smaž soubor (do koše) |
 | `drive_list_shared_drives` | Vypiš sdílené disky |
 
