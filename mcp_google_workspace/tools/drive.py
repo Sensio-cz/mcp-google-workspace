@@ -69,3 +69,18 @@ async def drive_delete_file(file_id: str) -> dict[str, Any]:
 async def drive_list_shared_drives(page_size: int = 100) -> dict[str, Any]:
     """Vypis sdilene disky na Google Drive."""
     return {"drives": _get_drive().list_shared_drives(page_size)}
+
+
+@mcp.tool()
+async def drive_create_comment(file_id: str, content: str, quoted_text: str | None = None) -> dict[str, Any]:
+    """Pridej komentar k souboru na Google Drive (Docs, Sheets, Slides i obycejne soubory), pod jmenem
+    prihlaseneho uzivatele. Komentar uvidi kazdy, kdo ma k souboru pristup. quoted_text = citat z dokumentu,
+    ke kteremu komentar patri; Google komentar zalozeny pres API v Docs nepripne ke zvyraznenemu textu,
+    proto se citat vlozi na zacatek textu komentare ('K textu: ...')."""
+    return _get_drive().create_comment(file_id, content, quoted_text)
+
+
+@mcp.tool()
+async def drive_list_comments(file_id: str, page_size: int = 100) -> dict[str, Any]:
+    """Vypis komentare k souboru na Google Drive (text, autor, vyreseno, citat, odpovedi)."""
+    return {"comments": _get_drive().list_comments(file_id, page_size)}

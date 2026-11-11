@@ -163,6 +163,31 @@ class DriveService:
         self.service.files().delete(fileId=file_id, supportsAllDrives=True).execute()
         return {"success": True}
 
+    _COMMENT_FIELDS = "id, content, createdTime, resolved, author(displayName)"
+
+    def create_comment(self, file_id: str, content: str, quoted_text: str | None = None) -> dict:
+        """Prida komentar k souboru. Google u Docs nepripne komentar zalozeny pres API ke zvyraznenemu
+        textu, proto citat (quoted_text) jde na zacatek textu komentare."""
+        if not content or not content.strip():
+            raise ValueError("Komentar nesmi byt prazdny.")
+        text = content.strip()
+        if quoted_text and quoted_text.strip():
+            text = f"K textu: „{quoted_text.strip()}“\n\n{text}"
+        return self.service.comments().create(
+            fileId=file_id,
+            body={"content": text},
+            fields=self._COMMENT_FIELDS,
+        ).execute()
+
+    def list_comments(self, file_id: str, page_size: int = 100) -> list[dict]:
+        result = self.service.comments().list(
+            fileId=file_id,
+            pageSize=min(max(1, page_size), 100),
+            includeDeleted=False,
+            fields=f"comments({self._COMMENT_FIELDS}, quotedFileContent(value), replies(content, author(displayName)))",
+        ).execute()
+        return result.get("comments", [])
+
     def list_shared_drives(self, page_size: int = 100) -> list[dict]:
         results = self.service.drives().list(
             pageSize=min(max(1, page_size), 100),

@@ -117,6 +117,8 @@ https://mcp-google-workspace.sensio.cz/mcp
 | `drive_update_file_content` | Přepiš obsah existujícího souboru (ID a odkaz zůstávají; u Google dokumentu převede HTML/text) |
 | `drive_delete_file` | Smaž soubor |
 | `drive_list_shared_drives` | Vypiš sdílené disky |
+| `drive_create_comment` | Přidej komentář k souboru (citát jde na začátek textu, Docs ho nepřipnou ke zvýraznění) |
+| `drive_list_comments` | Vypiš komentáře k souboru |
 
 ## Sheets Tools
 
