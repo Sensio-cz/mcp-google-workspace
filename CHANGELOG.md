@@ -4,6 +4,16 @@ Všechny podstatné změny v projektu mcp-google-workspace.
 
 Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 11. 11. 2026
+
+### Přidáno
+- **`drive_create_comment`** a **`drive_list_comments`** - komentáře k souboru na Drive přes
+  `comments().create` a `comments().list`. Dosud šlo Doc jen přečíst nebo celý přepsat,
+  připomínky k dokumentu šlo dát jen ručně (11. 11. 2026, podklad NetWalking Pro 2027).
+  Google komentář založený přes API v Docs nepřipne ke zvýrazněnému textu, proto se citát
+  (`quoted_text`) vloží na začátek textu komentáře. Prázdný komentář končí chybou. Stačí
+  stávající rozsah `auth/drive`, nové přihlášení není potřeba. Test `tests/test_komentare_dokumentu.py`.
+
 ## [0.4.0] - 15. 10. 2026
 
 ### Přidáno
