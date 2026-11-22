@@ -78,8 +78,21 @@ _ZAVIRACI = re.compile(
 )
 
 
+# Navic proti untrusted.mjs (revize A 22. 11. 2026): ozdobne, matematicke, polovicni a kratke
+# zavorky. Seznam neni nikdy uplny; zdi je to, ze nastroje vlny 1 nic neodesilaji.
+_OTEVIRACI_NAVIC = re.compile(
+    "[\u2768\u276A\u276C\u276E\u2770\u2774\u27C5\u2985\u2987\u2989\u298B\u298D\u298F"
+    "\u2991\u2993\u2995\u2E22\u2E24\u2E26\uFF62]"
+)
+_ZAVIRACI_NAVIC = re.compile(
+    "[\u2769\u276B\u276D\u276F\u2771\u2775\u27C6\u2986\u2988\u298A\u298C\u298E\u2990"
+    "\u2992\u2994\u2996\u2E23\u2E25\u2E27\uFF63]"
+)
+
+
 def neutralizuj(text: str) -> str:
-    return _ZAVIRACI.sub("]", _OTEVIRACI.sub("[", text))
+    text = _OTEVIRACI_NAVIC.sub("[", _OTEVIRACI.sub("[", text))
+    return _ZAVIRACI_NAVIC.sub("]", _ZAVIRACI.sub("]", text))
 
 
 def obal_cizi(ucet: str, data: Any) -> dict[str, Any]:
@@ -176,12 +189,21 @@ async def _vlakno(ucet: Optional[str], fn: Callable[[str], Any], cizi: bool = Fa
     return await anyio.to_thread.run_sync(partial(_proved, ucet, fn, cizi))
 
 
+def _jeden_radek(text: Optional[str]) -> str:
+    """Konec radku v hlavicce = vlozeni dalsi hlavicky (napr. Bcc) do konceptu; na mezeru."""
+    return re.sub(r"[\r\n]+", " ", text or "")
+
+
 def _hlavicka(hodnota: str) -> str:
-    """Hlavicka zpravy dekodovana z RFC 2047, aby se pri skladani konceptu nekodovala podruhe."""
+    """Hlavicka zpravy dekodovana z RFC 2047 (at se pri skladani nekoduje podruhe), na jeden radek.
+
+    Zakodovane slovo muze nest CR/LF (revize A: predmet s `=?utf-8?q?...=0D=0A...?=` od ciziho
+    odesilatele); po dekodovani by Python 3.13 hlavicku odmitl a starsi Python ji vlozil.
+    """
     try:
-        return str(make_header(decode_header(hodnota or "")))
+        return _jeden_radek(str(make_header(decode_header(hodnota or ""))))
     except Exception:  # noqa: BLE001
-        return hodnota or ""
+        return _jeden_radek(hodnota)
 
 
 def _zprava(g: GmailService, msg: dict) -> dict[str, Any]:
@@ -285,7 +307,7 @@ async def create_gmail_draft(to: str, subject: str, body: str, cc: Optional[list
         g = GateGmail(u)
         if not adresy(to):
             return {"error": True, "code": "TO_INVALID", "message": f"Neplatný adresát '{to}'."}
-        mime = g._build_message(to, subject, body, None, cc)
+        mime = g._build_message(to, _jeden_radek(subject), body, None, cc)
         if bcc and adresy(", ".join(bcc)):
             mime["Bcc"] = adresy(", ".join(bcc))
         raw = base64.urlsafe_b64encode(mime.as_bytes()).decode()
@@ -314,7 +336,7 @@ async def gmail_update_draft(draft_id: str, body: str, to: Optional[str] = None,
             return {"error": True, "code": "TO_INVALID", "message": "Koncept nemá platného adresáta; zadej parametr to."}
         mime = g._build_message(
             to=komu,
-            subject=subject if subject is not None else _hlavicka(h.get("subject", "")),
+            subject=_jeden_radek(subject) if subject is not None else _hlavicka(h.get("subject", "")),
             body=body,
             signature_html=None,
             cc=cc if cc is not None else ([_hlavicka(h["cc"])] if h.get("cc") else None),

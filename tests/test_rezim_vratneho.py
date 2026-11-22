@@ -563,3 +563,44 @@ def test_hledani_posty_ma_strop(vratny):
         _spust(_app().query_gmail_emails(query="x", max_results=500))
     seznam = [z for z in vratny.zaznamy if z["cesta"].endswith("/users/me/messages")][0]
     assert seznam["dotaz"]["maxResults"] == ["50"]
+
+
+# --- nalezy revize A (22. 11. 2026) ------------------------------------------
+
+def test_id_s_teckami_klient_neposle(vratny):
+    with ZakazSite():
+        r = _spust(_app().drive_read_file_content(file_id="..", ucet="sensio"))
+    assert r["code"] == "PATH_INVALID" and vratny.zaznamy == []
+
+
+def test_prilis_dlouhy_dotaz_je_pravdiva_veta(vratny):
+    with ZakazSite():
+        r = _spust(_app().drive_search_files(query="name contains '" + "x" * 3000 + "'", ucet="sensio"))
+    assert r["code"] == "REQUEST_TOO_LONG"
+    assert not any(z["metoda"] == "POST" for z in vratny.zaznamy)
+
+
+def test_konec_radku_v_predmetu_konceptu_nevlozi_hlavicku(vratny):
+    vratny.koncept_hlavicky = [
+        {"name": "To", "value": "a@example.org"},
+        {"name": "Subject", "value": "=?utf-8?q?Faktura=0D=0ABcc=3A_x=40evil=2Eexample?="},
+    ]
+    with ZakazSite():
+        r = _spust(_app().gmail_update_draft(draft_id="d1", body="novy"))
+    assert not r.get("error"), r
+    zprava, _ = _mime(json.loads([z for z in vratny.zaznamy if z["metoda"] == "PUT"][0]["telo"])["message"]["raw"])
+    assert zprava["Bcc"] is None
+    assert "evil" in str(make_header(decode_header(zprava["Subject"])))
+
+
+def test_neplatna_adresa_vratneho_nevypise_hodnotu(monkeypatch):
+    from mcp_google_workspace.auth import gate
+    monkeypatch.setenv("GOOGLE_WORKSPACE_GATE_URL", "http://uzivatel:tajne-heslo@trezor:8767/_osoba")
+    with pytest.raises(gate.GateError) as e:
+        gate.gate_url()
+    assert "tajne-heslo" not in e.value.message
+
+
+def test_napodobeniny_zavorek(vratny):
+    text = _app().neutralizuj("❬x❭ ⦅y⦆ ⸢z⸣ ⟅w⟆ ｢v｣ ⟦u⟧")
+    assert text == "[x] [y] [z] [w] [v] [u]"

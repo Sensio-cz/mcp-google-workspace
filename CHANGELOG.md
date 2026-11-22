@@ -19,6 +19,10 @@ Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: 
   označený jako cizí text bez pokynů, chyby vrátného jako věta pro člověka. Moduly
   `auth/gate.py` a `gate_app.py`, dokumentace `docs/rezim-vratneho.md`, testy
   `tests/test_rezim_vratneho.py` a `tests/test_bez_vratneho_beze_zmeny.py`.
+  Po dvou nezávislých revizích: koncepty s více adresáty, skrytou kopií a jmény s čárkou, úprava
+  konceptu zachová adresáty a odmítne koncept s přílohou, konec řádku v hlavičce nevloží další
+  hlavičku, každá chyba nástroje je věta, proxy z prostředí se nepoužije, id `.`/`..` se neposílá,
+  volání běží mimo smyčku MCP. Známá omezení v `docs/rezim-vratneho.md`.
 
 ### Změněno
 - Služby (`services/gmail.py`, `drive.py`, `calendar.py`) načítají kontext přihlášení až při

@@ -59,6 +59,20 @@ sama: `MediaIoBaseDownload` přejde na `Content-Location` odpovědi, nahráván�
 - Chyby vrátného (`X-Trezor-Reason`) se vracejí jako `{"error": true, "code", "message"}` s větou pro
   člověka, např. `ACCOUNT_DISCONNECTED` -> „Připoj účet znovu: kryton-ucty pripoj google --jmeno <ucet>".
 
+## Známá omezení (vědomě, 22. 11. 2026)
+
+- Koncept s přílohou `gmail_update_draft` odmítne (`DRAFT_HAS_ATTACHMENTS`): ukládá jen prostý text a přílohy
+  i formátování by smazal. Upravený koncept je vždy prostý text.
+- Odkaz na koncept míří na `mail.google.com/mail/u/0/`, tedy na první účet přihlášený v prohlížeči; při více
+  účtech může otevřít jiný.
+- Seznam účtů (výchozí `ucet`) si server pamatuje 60 s; `ucty_seznam` čte vždy čerstvě.
+- Pošle-li vrátný od Googlu `Content-Location`, stažení souboru nad 100 MB (druhá část) klient odmítne
+  (`GATE_HOST_REFUSED`) - token pracovny nikam jinam neodejde. Vrátný má `Content-Location` zahazovat (S1).
+- Adresa delší než 2048 znaků (dlouhý dotaz) končí `REQUEST_TOO_LONG`; knihovna by ji jinak přepsala na POST,
+  který vrátný odmítne.
+- Převzato z masteru: `drive_search_files` a `drive_list_comments` nestránkují; metadata v
+  `drive_read_file_content` se čtou bez `supportsAllDrives`.
+
 ## Instalace do pracovny bez sítě za běhu
 
 Python v obrazu pracovny nemá `venv`; systémová instalace by se srazila s piny jiných balíčků. Proto

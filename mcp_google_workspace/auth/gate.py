@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import http.client
 import json
 import os
 import re
@@ -104,8 +105,9 @@ def gate_url() -> str:
     if p.scheme not in ("http", "https") or not p.netloc or p.query or p.fragment or "@" in p.netloc:
         raise GateError(
             "GATE_URL_INVALID",
-            f"Proměnná {GATE_URL_ENV} musí být adresa vrátného, např. http://trezor:8767/_osoba "
-            f"(je '{raw}').",
+            # Hodnotu nevypisovat: adresa s user:heslo@ by heslo dala do chyby a logu (revize A).
+            f"Proměnná {GATE_URL_ENV} musí být adresa vrátného bez přihlašovacích údajů, "
+            "např. http://trezor:8767/_osoba.",
         )
     return url
 
@@ -218,11 +220,21 @@ class GateHttp(httplib2.Http):
                 "Požadavek mířil mimo vrátného Stáze a klient ho neodeslal (nahrávání a přesměrování "
                 "režim vrátného nemá).",
             )
+        zbytek = urllib.parse.urlsplit(uri[len(predpona):]).path
+        if any(seg in (".", "..") for seg in zbytek.split("/")):
+            # Knihovna id "." a ".." nekoduje (S1); klient je neposle, at nezalezi na normalizaci vratneho.
+            raise GateError("PATH_INVALID", "Id '.' ani '..' nejde poslat (vrátný by cestu odmítl).")
+        if any(k.lower() == "x-http-method-override" for k in (headers or {})):
+            # googleapiclient prepise GET s adresou nad 2048 znaku na POST s touto hlavickou; vratny ji
+            # zahodi a POST odmitne. Rict to rovnou a pravdive.
+            raise GateError("REQUEST_TOO_LONG", "Dotaz je moc dlouhý (adresa nad 2048 znaků); zkrať ho.")
         h = {k: v for k, v in (headers or {}).items() if k.lower() not in _ZAKAZANE_HLAVICKY}
         h.update(_hlavicky(UCEL_TOKEN, self.ucet))
         try:
             return super().request(uri, method, body=body, headers=h, redirections=0,
                                    connection_type=connection_type)
+        except http.client.HTTPException as e:
+            raise GateError("GATE_BAD_RESPONSE", f"Vrátný Stáze odpověděl porušeně ({type(e).__name__}); zkus to za chvíli.") from None
         except (OSError, httplib2.HttpLib2Error, socket.timeout) as e:
             raise GateError(
                 "GATE_UNREACHABLE",
@@ -269,6 +281,8 @@ def seznam_uctu(cerstvy: bool = False) -> list[dict]:
     http.follow_redirects = False
     try:
         resp, obsah = http.request(f"{zaklad}/_seznam", "GET", headers=_hlavicky(UCEL_SEZNAM, ""), redirections=0)
+    except http.client.HTTPException as e:
+        raise GateError("GATE_BAD_RESPONSE", f"Vrátný Stáze odpověděl porušeně ({type(e).__name__}).") from None
     except (OSError, httplib2.HttpLib2Error, socket.timeout) as e:
         raise GateError(
             "GATE_UNREACHABLE",
