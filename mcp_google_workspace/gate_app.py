@@ -140,6 +140,13 @@ class GateGmail(_NaVratneho, GmailService):
     # Vic adres v To/Cc i pri odpovedi (`to=`); jen v rezimu vratneho, master se nemeni.
     _safe_to_header = staticmethod(adresy)
 
+    def _build_message(self, to, subject, body, signature_html, cc=None, in_reply_to=None, references=None):
+        # Vsechny koncepty (i odpoved z GmailService.reply_to_email): predmet na jeden radek
+        # a zadny koncept bez adresata, ktery by nastroj ohlasil jako uspech (revize A).
+        if not adresy(to):
+            raise gate.GateError("TO_INVALID", "Zpráva nemá platného adresáta; zadej parametr to.")
+        return super()._build_message(to, _jeden_radek(subject), body, signature_html, cc, in_reply_to, references)
+
     def get_signature(self) -> str:
         # settings/sendAs vratny ve vlne 1 odmita; podpis se v rezimu vratneho nepridava.
         return ""

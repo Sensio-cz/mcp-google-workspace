@@ -604,3 +604,31 @@ def test_neplatna_adresa_vratneho_nevypise_hodnotu(monkeypatch):
 def test_napodobeniny_zavorek(vratny):
     text = _app().neutralizuj("❬x❭ ⦅y⦆ ⸢z⸣ ⟅w⟆ ｢v｣ ⟦u⟧")
     assert text == "[x] [y] [z] [w] [v] [u]"
+
+
+def test_nedostupny_vratny_bez_parametru_ucet(monkeypatch, vratny):
+    """Bez `ucet` se nejdriv cte _seznam; vypadek vratneho musi byt veta, ne AttributeError."""
+    monkeypatch.setenv("GOOGLE_WORKSPACE_GATE_URL", "http://127.0.0.1:9/_osoba")
+    with ZakazSite():
+        r = _spust(_app().query_gmail_emails(query="x"))
+        s = _spust(_app().ucty_seznam())
+    assert r["code"] == "GATE_UNREACHABLE" and s["code"] == "GATE_UNREACHABLE"
+
+
+def test_odpoved_bez_platneho_adresata_neni_uspech(vratny):
+    vratny.obsah_zpravy = "x"
+    puvodni = vratny._data
+
+    def data(metoda, ucet, sluzba, cesta, dotaz):
+        status, h, telo = puvodni(metoda, ucet, sluzba, cesta, dotaz)
+        if cesta.endswith("messages/m1"):
+            d = json.loads(telo)
+            d["payload"]["headers"][0]["value"] = "nekdo bez adresy"
+            telo = json.dumps(d).encode()
+        return status, h, telo
+
+    vratny._data = data
+    with ZakazSite():
+        r = _spust(_app().gmail_reply_to_email(email_id="m1", reply_body="Diky"))
+    assert r["error"] and r["code"] == "TO_INVALID"
+    assert not any(z["metoda"] == "POST" for z in vratny.zaznamy)

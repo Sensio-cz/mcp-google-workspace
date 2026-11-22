@@ -277,10 +277,12 @@ def seznam_uctu(cerstvy: bool = False) -> list[dict]:
         hit = _ucty_cache.get(klic_pameti)
         if hit and not cerstvy and time.monotonic() - hit[0] < SEZNAM_PLATNOST_S:
             return hit[1]
-    http = httplib2.Http(timeout=TIMEOUT_S, proxy_info=None)
-    http.follow_redirects = False
+    # Jmeno `spojeni`, ne `http`: lokalni `http` by zakrylo modul http (http.client.HTTPException
+    # nize) a vypadek vratneho by skoncil AttributeError misto vety (revize A, kontrola oprav).
+    spojeni = httplib2.Http(timeout=TIMEOUT_S, proxy_info=None)
+    spojeni.follow_redirects = False
     try:
-        resp, obsah = http.request(f"{zaklad}/_seznam", "GET", headers=_hlavicky(UCEL_SEZNAM, ""), redirections=0)
+        resp, obsah = spojeni.request(f"{zaklad}/_seznam", "GET", headers=_hlavicky(UCEL_SEZNAM, ""), redirections=0)
     except http.client.HTTPException as e:
         raise GateError("GATE_BAD_RESPONSE", f"Vrátný Stáze odpověděl porušeně ({type(e).__name__}).") from None
     except (OSError, httplib2.HttpLib2Error, socket.timeout) as e:
