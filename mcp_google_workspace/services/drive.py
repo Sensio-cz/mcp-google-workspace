@@ -7,7 +7,18 @@ from typing import Any
 
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from googleapiclient.discovery import build
-from ..auth.context import get_current_google_credentials
+
+
+# KONTEXT PRIHLASENI SE NACITA AZ PRI VOLANI. `auth.context` tahne `config.py`, ktery
+# uz pri importu cte GOOGLE_WORKSPACE_CLIENT_SECRET a cestu ~/.config/mcp-google/.
+# Rezim vratneho (auth/gate.py) tyhle tridy pouziva s vlastni `service` a nic z toho
+# nacist nesmi (kontrakt C5). Bez rezimu vratneho je chovani stejne: jmeno funkce v modulu
+# zustava (testy ho patchuji), jen import probehne pri prvnim volani.
+def get_current_google_credentials():
+    from ..auth.context import get_current_google_credentials as _creds
+
+    return _creds()
+
 
 logger = logging.getLogger(__name__)
 

@@ -16,6 +16,10 @@ MCP server pro Google Workspace (Gmail, Drive, Sheets) s automatickým OAuth flo
 - **Auto OAuth**: při prvním použití se otevře prohlížeč pro Google přihlášení
 - **Multi-user**: každý uživatel se přihlásí svým účtem (Cloud Run remote)
 - **Reply fix**: správně zpracovává diakritiku v hlavičkách emailů
+- **Režim vrátného** (od 0.6.0): v pracovně Red Dwarfu jde každé volání přes vrátného Stáze,
+  server nemá vlastní přihlášení ani token Googlu a nabízí jen čtení pošty, Disku, kalendáře
+  a koncepty. Zapíná ho jen `GOOGLE_WORKSPACE_GATE_URL`; bez ní se nic nemění.
+  Viz [docs/rezim-vratneho.md](docs/rezim-vratneho.md).
 
 ## Quick Start (lokální)
 
@@ -148,6 +152,7 @@ Volitelné:
 | `GOOGLE_WORKSPACE_CLIENT_ID` | Přepsat výchozí OAuth klienta |
 | `MCP_TRANSPORT` | `streamable-http` pro Cloud Run |
 | `MCP_TOKEN_KEY` | Klíč na pečetění tokenů. **Povinný** pro `streamable-http`, viz [docs/nasazeni-a-klice.md](docs/nasazeni-a-klice.md). |
+| `GOOGLE_WORKSPACE_GATE_URL` | Režim vrátného (pracovna Red Dwarfu, jen stdio), viz [docs/rezim-vratneho.md](docs/rezim-vratneho.md). Na Cloud Runu se nenastavuje. |
 
 ## Release Status
 

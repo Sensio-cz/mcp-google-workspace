@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import email
 import json
 import os
 import subprocess
@@ -84,6 +85,11 @@ def _app():
 
 def _spust(coro):
     return asyncio.run(coro)
+
+
+def _mime(raw: str):
+    zprava = email.message_from_bytes(base64.urlsafe_b64decode(raw))
+    return zprava, zprava.get_payload(decode=True).decode("utf-8")
 
 
 def _datove(v):
@@ -214,8 +220,8 @@ def test_koncept_jde_telem_json_bez_podpisu_a_rika_to(vratny):
     assert len(posty) == 1
     assert posty[0]["hlavicky"]["content-type"].startswith("application/json")
     telo = json.loads(posty[0]["telo"])
-    mime = base64.urlsafe_b64decode(telo["message"]["raw"]).decode()
-    assert "Text" in mime and "text/plain" in mime
+    zprava, text = _mime(telo["message"]["raw"])
+    assert text == "Text" and zprava.get_content_type() == "text/plain"
     assert r["draft_id"] == "d1"
     assert "podpis" in r and "nepřid" in r["podpis"]
 
@@ -226,10 +232,10 @@ def test_uprava_konceptu_zachova_vlakno(vratny):
     put = [z for z in vratny.zaznamy if z["metoda"] == "PUT"][0]
     telo = json.loads(put["telo"])
     assert telo["message"]["threadId"] == "t1"
-    mime = base64.urlsafe_b64decode(telo["message"]["raw"]).decode()
-    assert "In-Reply-To: <m1@example.org>" in mime
-    assert "adresat@example.org" in mime and "Re: Podklady" in mime
-    assert "opraveny text" in mime
+    zprava, text = _mime(telo["message"]["raw"])
+    assert zprava["In-Reply-To"] == "<m1@example.org>"
+    assert zprava["To"] == "adresat@example.org" and zprava["Subject"] == "Re: Podklady"
+    assert text == "opraveny text"
 
 
 def test_odpoved_je_jen_koncept(vratny):
@@ -401,3 +407,29 @@ def test_obsah_posty_je_obaleny_jako_cizi_text(vratny):
     assert "⟦" not in vnitrek and "⟧" not in vnitrek and "〚" not in vnitrek
     assert "[nedůvěryhodný obsah – konec]" in vnitrek
     assert json.loads(vnitrek)["body"].startswith("Ahoj")
+
+
+# --- cela cesta: python -m mcp_google_workspace pres stdio ------------------
+
+def test_stdio_konec_do_konce(vratny):
+    """Skutecny proces jako v pracovne (C5) a skutecny klient MCP: seznam nastroju a jedno volani."""
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    env = {k: v for k, v in os.environ.items()}
+
+    async def beh():
+        params = StdioServerParameters(command=sys.executable, args=["-m", "mcp_google_workspace"], env=env)
+        async with stdio_client(params) as (cti, pis):
+            async with ClientSession(cti, pis) as s:
+                await s.initialize()
+                jmena = sorted(t.name for t in (await s.list_tools()).tools)
+                r = await s.call_tool("gmail_get_message_details", {"email_id": "m1"})
+                return jmena, r
+
+    jmena, r = _spust(beh())
+    assert jmena == NASTROJE_VLNY_1
+    assert not r.isError
+    data = r.structuredContent
+    assert data["ucet"] == "sensio" and data["obsah"].startswith("⟦nedůvěryhodný obsah – začátek⟧")
+    assert all(z["cesta"].startswith("/_osoba/") for z in vratny.zaznamy)

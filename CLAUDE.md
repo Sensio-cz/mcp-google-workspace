@@ -7,7 +7,8 @@ MCP server pro Google Workspace (Gmail, Drive, Sheets) s multi-user OAuth autent
 ```
 mcp-google-workspace/
 ├── mcp_google_workspace/
-│   ├── __main__.py          # Entry point (stdio + HTTP transport, --setup CLI)
+│   ├── __main__.py          # Entry point (stdio + HTTP transport, --setup CLI); s GOOGLE_WORKSPACE_GATE_URL rezim vratneho
+│   ├── gate_app.py          # Rezim vratneho (Red Dwarf, Staze): vlastni FastMCP, jen nastroje vlny 1
 │   ├── server.py            # FastMCP instance, OAuth provider, status stránka, /google/callback
 │   ├── config.py            # OAuth Client ID/Secret, cesty k credentials
 │   ├── auth/
@@ -16,7 +17,8 @@ mcp-google-workspace/
 │   │   ├── oauth_flow.py    # Lokální PKCE OAuth flow (otevře prohlížeč)
 │   │   ├── oauth_provider.py# Remote OAuth provider (proxy na Google pro claude.ai)
 │   │   ├── token_store.py   # In-memory úložiště Google tokenů per user (remote)
-│   │   └── context.py       # Request context - credentials přihlášeného uživatele
+│   │   ├── context.py       # Request context - credentials přihlášeného uživatele
+│   │   └── gate.py          # Rezim vratneho: token + klic pracovny ze souboru, dukaz X-Kryton-Proof, GateHttp
 │   ├── services/
 │   │   ├── gmail.py         # GmailService - 23 metod (query, reply, draft, labels, trash...)
 │   │   ├── drive.py         # DriveService - 10 metod (search, read, upload, update content, folder, delete, komentáře)
@@ -28,6 +30,7 @@ mcp-google-workspace/
 │       ├── sheets.py        # 7 Sheets tools
 │       └── calendar.py      # 6 Calendar tools
 ├── docs/nasazeni-a-klice.md  # Klíč na tokeny, adresa serveru, secret
+├── docs/rezim-vratneho.md    # Režim vrátného pro pracovny Red Dwarfu (bez proměnné se nic nemění)
 ├── tests/                    # pytest; `uv run --with pytest --with cryptography pytest tests/ -q`
 ├── Dockerfile               # Cloud Run deployment
 ├── pyproject.toml            # Verze, závislosti, entry point

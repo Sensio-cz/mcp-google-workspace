@@ -4,6 +4,27 @@ Všechny podstatné změny v projektu mcp-google-workspace.
 
 Formát: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), verzování: [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 22. 11. 2026
+
+### Přidáno
+- **Režim vrátného** pro pracovny Red Dwarfu (Stáze, plán „Google účty přes Stázi", kontrakty C4
+  a C5). Zapíná ho jen proměnná `GOOGLE_WORKSPACE_GATE_URL`: každé volání jde na vrátného
+  (`<GATE_URL>/<ucet>/<sluzba>/<cesta Googlu>`) s tokenem pracovny a důkazem klíčem pracovny
+  (`X-Kryton-Proof`), které se čtou ze souborů při každém požadavku; server nemá vlastní
+  přihlášení, nečte secret klienta ani `~/.config/mcp-google/` a mluví jen přes stdio. Nabízí jen
+  nástroje vlny 1 (čtení pošty, příloh, Disku včetně exportu a komentářů, kalendáře; koncepty
+  včetně úpravy a odpovědi jako koncept) s parametrem `ucet` a nástroj `ucty_seznam`; nové jsou
+  `gmail_list_drafts`, `gmail_get_draft`, `gmail_update_draft`, `calendar_list_calendars`,
+  `calendar_get_event`. Podpis se v tomto režimu nepřidává. Obsah pošty a dokumentů se vrací
+  označený jako cizí text bez pokynů, chyby vrátného jako věta pro člověka. Moduly
+  `auth/gate.py` a `gate_app.py`, dokumentace `docs/rezim-vratneho.md`, testy
+  `tests/test_rezim_vratneho.py` a `tests/test_bez_vratneho_beze_zmeny.py`.
+
+### Změněno
+- Služby (`services/gmail.py`, `drive.py`, `calendar.py`) načítají kontext přihlášení až při
+  volání, ne při importu, aby ho režim vrátného nemusel načíst. **Bez režimu vrátného se nic
+  nemění**: stejný seznam 38 nástrojů a stejný otisk jejich popisů a schémat (test).
+
 ## [0.5.0] - 11. 11. 2026
 
 ### Přidáno
