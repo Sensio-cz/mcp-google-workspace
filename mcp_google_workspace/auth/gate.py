@@ -148,7 +148,7 @@ def users_id() -> str:
         except (OSError, ValueError, AttributeError):
             raw = None
     hodnota = str(raw).strip() if raw is not None else ""
-    if not USERS_ID_RE.match(hodnota):
+    if not USERS_ID_RE.fullmatch(hodnota):
         raise GateError(
             "USERS_ID_MISSING",
             f"Nevím, čí je pracovna: chybí {USERS_ID_ENV} i ~/.config/kryton/ucty.json. Napiš správci Red Dwarfu.",
@@ -157,7 +157,7 @@ def users_id() -> str:
 
 
 def over_ucet(ucet: str) -> str:
-    if not isinstance(ucet, str) or not UCET_RE.match(ucet):
+    if not isinstance(ucet, str) or not UCET_RE.fullmatch(ucet):
         raise GateError(
             "UCET_INVALID",
             "Jméno účtu smí mít jen malá písmena bez diakritiky, číslice a pomlčku (např. 'sensio'); "
@@ -202,7 +202,9 @@ class GateHttp(httplib2.Http):
     """httplib2.Http, ktery mluvi jen s vratnym a ke kazdemu pozadavku prida token a dukaz."""
 
     def __init__(self, ucet: str):
-        super().__init__(timeout=TIMEOUT_S)
+        # proxy_info=None: httplib2 jinak bere http_proxy z prostredi a token pracovny by sel
+        # pres proxy (revize B). Vratny je v siti pracovny, proxy k nemu nepatri.
+        super().__init__(timeout=TIMEOUT_S, proxy_info=None)
         self.ucet = over_ucet(ucet)
         # 3xx se nenasleduje: vratny presmerovani Googlu nevraci (502 UPSTREAM_REDIRECT)
         # a kdyby prislo, token pracovny nesmi odejit na cizi adresu.
@@ -263,7 +265,7 @@ def seznam_uctu(cerstvy: bool = False) -> list[dict]:
         hit = _ucty_cache.get(klic_pameti)
         if hit and not cerstvy and time.monotonic() - hit[0] < SEZNAM_PLATNOST_S:
             return hit[1]
-    http = httplib2.Http(timeout=TIMEOUT_S)
+    http = httplib2.Http(timeout=TIMEOUT_S, proxy_info=None)
     http.follow_redirects = False
     try:
         resp, obsah = http.request(f"{zaklad}/_seznam", "GET", headers=_hlavicky(UCEL_SEZNAM, ""), redirections=0)
@@ -345,11 +347,17 @@ def chyba_z_odpovedi(resp, obsah, ucet: str) -> GateError:
 
 
 def preloz(e: Exception, ucet: str) -> GateError:
-    """HttpError knihovny (nebo GateError) na GateError s vetou pro cloveka."""
+    """Jakakoli vyjimka nastroje na GateError s vetou pro cloveka."""
     if isinstance(e, GateError):
         return e
     from googleapiclient.errors import HttpError
 
     if isinstance(e, HttpError):
         return chyba_z_odpovedi(e.resp, e.content, ucet)
-    raise e
+    # Cokoli jineho (KeyError z necekane odpovedi, chyba dekodovani...) je taky veta pro
+    # cloveka, ne syrova vyjimka v MCP (zadani bod 4, revize B). Jen jmeno typu: text
+    # vyjimky muze nest obsah zpravy nebo cestu s e-mailem.
+    return GateError(
+        "TOOL_ERROR",
+        f"Nástroj nečekaně selhal ({type(e).__name__}). Zkus to znovu; když se to opakuje, napiš správci Red Dwarfu.",
+    )

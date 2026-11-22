@@ -32,13 +32,16 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
-from email.header import decode_header, make_header
+from email.header import Header, decode_header, make_header
+from email.utils import formataddr, getaddresses
+from functools import partial
 from typing import Any, Callable, Optional
 
+import anyio
 from mcp.server.fastmcp import FastMCP
 
 from .auth import gate
-from .services.calendar import CalendarService, normalize_event
+from .services.calendar import CalendarService
 from .services.drive import DriveService
 from .services.gmail import GmailService
 
@@ -102,8 +105,27 @@ class _NaVratneho:
         return self._svc
 
 
+def adresy(raw: str) -> str:
+    """Hlavicka s JEDNOU NEBO VICE adresami (`a@x, "Novak, Jan" <jn@x>`), jmena v UTF-8.
+
+    `GmailService._safe_to_header` umi jen jednu adresu: u dvou vrati prazdny retezec a koncept
+    by se ulozil bez prijemcu (revize B, 22. 11. 2026). Konec radku = zadna adresa (vlozeni hlavicky).
+    """
+    if not raw or "\r" in raw or "\n" in raw:
+        return ""
+    vysledek = []
+    for jmeno, adresa in getaddresses([raw]):
+        if not adresa or "@" not in adresa:
+            continue
+        vysledek.append(formataddr((str(Header(jmeno, "utf-8")), adresa)) if jmeno else adresa)
+    return ", ".join(vysledek)
+
+
 class GateGmail(_NaVratneho, GmailService):
     _api = ("gmail", "v1")
+
+    # Vic adres v To/Cc i pri odpovedi (`to=`); jen v rezimu vratneho, master se nemeni.
+    _safe_to_header = staticmethod(adresy)
 
     def get_signature(self) -> str:
         # settings/sendAs vratny ve vlne 1 odmita; podpis se v rezimu vratneho nepridava.
@@ -112,6 +134,18 @@ class GateGmail(_NaVratneho, GmailService):
 
 class GateDrive(_NaVratneho, DriveService):
     _api = ("drive", "v3")
+
+    def _download_regular_file(self, file_id: str, mime_type: str) -> dict:
+        # Textovy soubor v jinem kodovani nez UTF-8 (CSV z Excelu v cp1250) by v DriveService
+        # skoncil UnicodeDecodeError; tady se vrati jako base64.
+        request = self.service.files().get_media(fileId=file_id, supportsAllDrives=True)
+        obsah = self._download(request)
+        if mime_type.startswith("text/") or mime_type == "application/json":
+            try:
+                return {"mimeType": mime_type, "content": obsah.decode("utf-8"), "encoding": "utf-8"}
+            except UnicodeDecodeError:
+                pass
+        return {"mimeType": mime_type, "content": base64.b64encode(obsah).decode(), "encoding": "base64"}
 
 
 class GateCalendar(_NaVratneho, CalendarService):
@@ -124,7 +158,7 @@ def _proved(ucet: Optional[str], fn: Callable[[str], Any], cizi: bool = False) -
     try:
         vybrany = gate.vyber_ucet(ucet)
         vysledek = fn(vybrany)
-    except Exception as e:  # noqa: BLE001 - neznama vyjimka projde dal (preloz ji znovu vyhodi)
+    except Exception as e:  # noqa: BLE001
         g = gate.preloz(e, vybrany or (ucet or ""))
         chyba = {"error": True, "code": g.code, "message": g.message}
         if vybrany:
@@ -135,6 +169,11 @@ def _proved(ucet: Optional[str], fn: Callable[[str], Any], cizi: bool = False) -
     if isinstance(vysledek, dict):
         return {"ucet": vybrany, **vysledek}
     return {"ucet": vybrany, "vysledek": vysledek}
+
+
+async def _vlakno(ucet: Optional[str], fn: Callable[[str], Any], cizi: bool = False) -> dict[str, Any]:
+    """Volani vratneho je blokujici (httplib2): bezi ve vlakne, aby smycka MCP (ping, zruseni) zila."""
+    return await anyio.to_thread.run_sync(partial(_proved, ucet, fn, cizi))
 
 
 def _hlavicka(hodnota: str) -> str:
@@ -157,6 +196,19 @@ def _zprava(g: GmailService, msg: dict) -> dict[str, Any]:
     }
 
 
+def _ma_prilohy(payload: dict) -> bool:
+    if payload.get("filename") or (payload.get("body", {}) or {}).get("attachmentId"):
+        return True
+    return any(_ma_prilohy(p) for p in payload.get("parts", []) or [])
+
+
+def _udalost(e: dict) -> dict[str, Any]:
+    """Udalost kalendare bez logiky uvitaci tabule Sensia (ta skryva ucastniky z @sensio.cz)."""
+    klice = ("id", "summary", "description", "location", "start", "end", "status", "htmlLink",
+             "organizer", "attendees", "recurringEventId", "hangoutLink")
+    return {k: e[k] for k in klice if k in e}
+
+
 def _koncept(draft: dict) -> dict[str, Any]:
     m = draft.get("message", {}) or {}
     return {
@@ -175,27 +227,31 @@ def _koncept(draft: dict) -> dict[str, Any]:
     "kryton-ucty pripoj google --jmeno <ucet>."
 ))
 async def ucty_seznam() -> dict[str, Any]:
-    try:
-        return {"ucty": gate.seznam_uctu(cerstvy=True)}
-    except Exception as e:  # noqa: BLE001
-        g = gate.preloz(e, "")
-        return {"error": True, "code": g.code, "message": g.message}
+    def fn():
+        try:
+            return {"ucty": gate.seznam_uctu(cerstvy=True)}
+        except Exception as e:  # noqa: BLE001
+            g = gate.preloz(e, "")
+            return {"error": True, "code": g.code, "message": g.message}
+    return await anyio.to_thread.run_sync(fn)
 
 
 @mcp.tool(description="Vyhledej e-maily v Gmailu (Gmail query syntax: is:unread, from:, subject:, newer_than:7d)."
           + CIZI_VETA + UCET_VETA)
 async def query_gmail_emails(query: str, max_results: int = 10, ucet: Optional[str] = None) -> dict[str, Any]:
-    return _proved(ucet, lambda u: {"emails": GateGmail(u).query_emails(query, max_results)}, cizi=True)
+    # Kazda nalezena zprava je dalsi volani (format=full): strop 50, at hledani nevycerpa minutovy strop uctu.
+    pocet = max(1, min(max_results, 50))
+    return await _vlakno(ucet, lambda u: {"emails": GateGmail(u).query_emails(query, pocet)}, cizi=True)
 
 
 @mcp.tool(description="Detail e-mailu včetně těla zprávy." + CIZI_VETA + UCET_VETA)
 async def gmail_get_message_details(email_id: str, ucet: Optional[str] = None) -> dict[str, Any]:
-    return _proved(ucet, lambda u: GateGmail(u).get_email_by_id(email_id), cizi=True)
+    return await _vlakno(ucet, lambda u: GateGmail(u).get_email_by_id(email_id), cizi=True)
 
 
 @mcp.tool(description="Stáhni obsah přílohy e-mailu (base64url)." + CIZI_VETA + UCET_VETA)
 async def gmail_get_attachment_content(email_id: str, attachment_id: str, ucet: Optional[str] = None) -> dict[str, Any]:
-    return _proved(ucet, lambda u: GateGmail(u).get_attachment(email_id, attachment_id), cizi=True)
+    return await _vlakno(ucet, lambda u: GateGmail(u).get_attachment(email_id, attachment_id), cizi=True)
 
 
 @mcp.tool(description="Vypiš koncepty e-mailů (id konceptu a zprávy; obsah vrátí gmail_get_draft)." + UCET_VETA)
@@ -207,7 +263,7 @@ async def gmail_list_drafts(max_results: int = 10, page_token: Optional[str] = N
             params["pageToken"] = page_token
         r = GateGmail(u).service.users().drafts().list(**params).execute()
         return {"drafts": r.get("drafts", []), "next_page_token": r.get("nextPageToken")}
-    return _proved(ucet, fn)
+    return await _vlakno(ucet, fn)
 
 
 @mcp.tool(description="Přečti koncept e-mailu (adresát, předmět, text)." + CIZI_VETA + UCET_VETA)
@@ -216,7 +272,7 @@ async def gmail_get_draft(draft_id: str, ucet: Optional[str] = None) -> dict[str
         g = GateGmail(u)
         d = g.service.users().drafts().get(userId="me", id=draft_id, format="full").execute()
         return {"draft_id": d.get("id"), "message": _zprava(g, d.get("message", {}) or {})}
-    return _proved(ucet, fn, cizi=True)
+    return await _vlakno(ucet, fn, cizi=True)
 
 
 @mcp.tool(description=(
@@ -226,9 +282,16 @@ async def gmail_get_draft(draft_id: str, ucet: Optional[str] = None) -> dict[str
 async def create_gmail_draft(to: str, subject: str, body: str, cc: Optional[list[str]] = None,
                              bcc: Optional[list[str]] = None, ucet: Optional[str] = None) -> dict[str, Any]:
     def fn(u):
-        r = GateGmail(u).create_draft(to, subject, body, cc, bcc, include_signature=False)
-        return {"draft_id": r["draft_id"], "message_id": r["message_id"], "url": r["url"], "podpis": PODPIS_VETA}
-    return _proved(ucet, fn)
+        g = GateGmail(u)
+        if not adresy(to):
+            return {"error": True, "code": "TO_INVALID", "message": f"Neplatný adresát '{to}'."}
+        mime = g._build_message(to, subject, body, None, cc)
+        if bcc and adresy(", ".join(bcc)):
+            mime["Bcc"] = adresy(", ".join(bcc))
+        raw = base64.urlsafe_b64encode(mime.as_bytes()).decode()
+        r = g.service.users().drafts().create(userId="me", body={"message": {"raw": raw}}).execute()
+        return _koncept(r)
+    return await _vlakno(ucet, fn)
 
 
 @mcp.tool(description=(
@@ -241,17 +304,25 @@ async def gmail_update_draft(draft_id: str, body: str, to: Optional[str] = None,
         g = GateGmail(u)
         d = g.service.users().drafts().get(userId="me", id=draft_id, format="full").execute()
         msg = d.get("message", {}) or {}
-        h = {x["name"].lower(): x["value"] for x in (msg.get("payload", {}) or {}).get("headers", [])}
-        puvodni_cc = [a.strip() for a in _hlavicka(h.get("cc", "")).split(",") if a.strip()]
+        payload = msg.get("payload", {}) or {}
+        if _ma_prilohy(payload):
+            return {"error": True, "code": "DRAFT_HAS_ATTACHMENTS",
+                    "message": "Koncept má přílohy; úprava by je smazala (ukládá jen prostý text). Uprav ho v Gmailu."}
+        h = {x["name"].lower(): x["value"] for x in payload.get("headers", [])}
+        komu = to if to is not None else _hlavicka(h.get("to", ""))
+        if not adresy(komu):
+            return {"error": True, "code": "TO_INVALID", "message": "Koncept nemá platného adresáta; zadej parametr to."}
         mime = g._build_message(
-            to=to if to is not None else _hlavicka(h.get("to", "")),
+            to=komu,
             subject=subject if subject is not None else _hlavicka(h.get("subject", "")),
             body=body,
             signature_html=None,
-            cc=cc if cc is not None else (puvodni_cc or None),
+            cc=cc if cc is not None else ([_hlavicka(h["cc"])] if h.get("cc") else None),
             in_reply_to=h.get("in-reply-to"),
             references=h.get("references"),
         )
+        if h.get("bcc") and adresy(_hlavicka(h["bcc"])):
+            mime["Bcc"] = adresy(_hlavicka(h["bcc"]))
         zprava: dict[str, Any] = {"raw": base64.urlsafe_b64encode(mime.as_bytes()).decode()}
         if msg.get("threadId"):
             zprava["threadId"] = msg["threadId"]
@@ -259,12 +330,12 @@ async def gmail_update_draft(draft_id: str, body: str, to: Optional[str] = None,
             userId="me", id=draft_id, body={"id": draft_id, "message": zprava}
         ).execute()
         return _koncept(r)
-    return _proved(ucet, fn)
+    return await _vlakno(ucet, fn)
 
 
 @mcp.tool(description="Smaž koncept e-mailu (jen koncept; odeslané a přijaté zprávy mazat nejde)." + UCET_VETA)
 async def delete_gmail_draft(draft_id: str, ucet: Optional[str] = None) -> dict[str, Any]:
-    return _proved(ucet, lambda u: GateGmail(u).delete_draft(draft_id))
+    return await _vlakno(ucet, lambda u: GateGmail(u).delete_draft(draft_id))
 
 
 @mcp.tool(description=(
@@ -279,31 +350,31 @@ async def gmail_reply_to_email(email_id: str, reply_body: str, reply_all: bool =
         if r.get("error"):
             return r
         return {"draft_id": r["draft_id"], "message_id": r["message_id"], "url": r["url"], "podpis": PODPIS_VETA}
-    return _proved(ucet, fn)
+    return await _vlakno(ucet, fn)
 
 
 @mcp.tool(description="Vyhledej soubory na Google Disku (Drive query syntax: name contains 'x', mimeType='...')."
           + CIZI_VETA + UCET_VETA)
 async def drive_search_files(query: str, page_size: int = 10, shared_drive_id: Optional[str] = None,
                              ucet: Optional[str] = None) -> dict[str, Any]:
-    return _proved(ucet, lambda u: {"files": GateDrive(u).search_files(query, page_size, shared_drive_id)}, cizi=True)
+    return await _vlakno(ucet, lambda u: {"files": GateDrive(u).search_files(query, page_size, shared_drive_id)}, cizi=True)
 
 
 @mcp.tool(description="Přečti obsah souboru z Google Disku (Docs jako markdown, Sheets jako CSV, ostatní soubory "
           "jako text nebo base64)." + CIZI_VETA + UCET_VETA)
 async def drive_read_file_content(file_id: str, ucet: Optional[str] = None) -> dict[str, Any]:
-    return _proved(ucet, lambda u: GateDrive(u).read_file_content(file_id), cizi=True)
+    return await _vlakno(ucet, lambda u: GateDrive(u).read_file_content(file_id), cizi=True)
 
 
 @mcp.tool(description="Vypiš komentáře k souboru na Google Disku (text, autor, vyřešeno, citát, odpovědi)."
           + CIZI_VETA + UCET_VETA)
 async def drive_list_comments(file_id: str, page_size: int = 100, ucet: Optional[str] = None) -> dict[str, Any]:
-    return _proved(ucet, lambda u: {"comments": GateDrive(u).list_comments(file_id, page_size)}, cizi=True)
+    return await _vlakno(ucet, lambda u: {"comments": GateDrive(u).list_comments(file_id, page_size)}, cizi=True)
 
 
 @mcp.tool(description="Vypiš sdílené disky na Google Disku." + CIZI_VETA + UCET_VETA)
 async def drive_list_shared_drives(page_size: int = 100, ucet: Optional[str] = None) -> dict[str, Any]:
-    return _proved(ucet, lambda u: {"drives": GateDrive(u).list_shared_drives(page_size)}, cizi=True)
+    return await _vlakno(ucet, lambda u: {"drives": GateDrive(u).list_shared_drives(page_size)}, cizi=True)
 
 
 @mcp.tool(description=(
@@ -326,9 +397,9 @@ async def calendar_list_events(calendar_id: str = "primary", time_min: Optional[
         if page_token:
             params["pageToken"] = page_token
         r = GateCalendar(u).service.events().list(**params).execute()
-        udalosti = [normalize_event(e, calendar_id) for e in r.get("items", [])]
+        udalosti = [_udalost(e) for e in r.get("items", [])]
         return {"count": len(udalosti), "events": udalosti, "next_page_token": r.get("nextPageToken")}
-    return _proved(ucet, fn, cizi=True)
+    return await _vlakno(ucet, fn, cizi=True)
 
 
 @mcp.tool(description="Vypiš kalendáře, které účet vidí (id, název, role)." + CIZI_VETA + UCET_VETA)
@@ -340,17 +411,14 @@ async def calendar_list_calendars(ucet: Optional[str] = None) -> dict[str, Any]:
              "accessRole": c.get("accessRole"), "timeZone": c.get("timeZone")}
             for c in r.get("items", [])
         ]}
-    return _proved(ucet, fn, cizi=True)
+    return await _vlakno(ucet, fn, cizi=True)
 
 
 @mcp.tool(description="Přečti jednu událost kalendáře (název, čas, popis, místo, účastníci)." + CIZI_VETA + UCET_VETA)
 async def calendar_get_event(calendar_id: str, event_id: str, ucet: Optional[str] = None) -> dict[str, Any]:
     def fn(u):
-        e = GateCalendar(u).service.events().get(calendarId=calendar_id, eventId=event_id).execute()
-        klice = ("id", "summary", "description", "location", "start", "end", "status", "htmlLink",
-                 "organizer", "attendees", "recurringEventId", "hangoutLink")
-        return {k: e[k] for k in klice if k in e}
-    return _proved(ucet, fn, cizi=True)
+        return _udalost(GateCalendar(u).service.events().get(calendarId=calendar_id, eventId=event_id).execute())
+    return await _vlakno(ucet, fn, cizi=True)
 
 
 def main() -> None:

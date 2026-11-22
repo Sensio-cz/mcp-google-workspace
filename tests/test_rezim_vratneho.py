@@ -23,6 +23,7 @@ import asyncio
 import base64
 import email
 import json
+from email.header import decode_header, make_header
 import os
 import subprocess
 import sys
@@ -90,6 +91,40 @@ def _spust(coro):
 def _mime(raw: str):
     zprava = email.message_from_bytes(base64.urlsafe_b64decode(raw))
     return zprava, zprava.get_payload(decode=True).decode("utf-8")
+
+
+# Tabulka S1 (.relay/gst-r253-s1-mereni.md v Red Dwarfu): trasa -> povolene parametry dotazu.
+# Podklad vyctu vratneho (P4); test hlida, ze klient nezacne posilat nic mimo ni.
+_S1 = [
+    ("GET", r"gmail/v1/users/me/messages", {"alt", "q", "maxResults", "pageToken"}),
+    ("GET", r"gmail/v1/users/me/messages/[^/]+", {"alt", "format"}),
+    ("GET", r"gmail/v1/users/me/messages/[^/]+/attachments/[^/]+", {"alt"}),
+    ("GET", r"gmail/v1/users/me/profile", {"alt"}),
+    ("GET", r"gmail/v1/users/me/drafts", {"alt", "maxResults", "pageToken", "q"}),
+    ("GET", r"gmail/v1/users/me/drafts/[^/]+", {"alt", "format"}),
+    ("POST", r"gmail/v1/users/me/drafts", {"alt"}),
+    ("PUT", r"gmail/v1/users/me/drafts/[^/]+", {"alt"}),
+    ("DELETE", r"gmail/v1/users/me/drafts/[^/]+", set()),
+    ("GET", r"drive/v3/files", {"alt", "q", "pageSize", "fields", "supportsAllDrives",
+                                "includeItemsFromAllDrives", "corpora", "driveId"}),
+    ("GET", r"drive/v3/files/[^/]+", {"alt", "fields", "supportsAllDrives"}),
+    ("GET", r"drive/v3/files/[^/]+/export", {"alt", "mimeType"}),
+    ("GET", r"drive/v3/files/[^/]+/comments", {"alt", "pageSize", "includeDeleted", "fields"}),
+    ("GET", r"drive/v3/drives", {"alt", "pageSize", "fields"}),
+    ("GET", r"calendar/v3/calendars/[^/]+/events", {"alt", "timeMin", "timeMax", "q", "maxResults",
+                                                    "singleEvents", "orderBy", "pageToken"}),
+    ("GET", r"calendar/v3/calendars/[^/]+/events/[^/]+", {"alt"}),
+    ("GET", r"calendar/v3/users/me/calendarList", {"alt", "maxResults", "pageToken"}),
+]
+
+
+def _parametry_s1(metoda, cesta):
+    import re
+    google = cesta.split("/", 4)[4]  # /_osoba/<ucet>/<sluzba>/<cesta Googlu>
+    for m, vzor, povolene in _S1:
+        if m == metoda and re.fullmatch(vzor, google):
+            return povolene
+    return None
 
 
 def _datove(v):
@@ -198,6 +233,10 @@ def test_vsechny_nastroje_jdou_jen_na_vratneho(vratny):
         assert z["cesta"] == "/_osoba/_seznam" or z["cesta"].startswith("/_osoba/sensio/"), z["cesta"]
         assert "/upload/" not in z["cesta"] and "/batch/" not in z["cesta"]
         assert "settings/sendAs" not in z["cesta"], "podpis cte nastaveni schranky, ktere vratny odmita"
+    for z in _datove(vratny):
+        povolene = _parametry_s1(z["metoda"], z["cesta"])
+        assert povolene is not None, ("trasa mimo tabulku S1", z["metoda"], z["cesta"])
+        assert set(z["dotaz"]) <= povolene, (z["cesta"], set(z["dotaz"]) - povolene)
     trojice = {(z["metoda"], z["cesta"]) for z in vratny.zaznamy}
     assert ("GET", "/_osoba/sensio/calendar/calendar/v3/calendars/jan.novak%40example.org/events") in trojice
     assert ("GET", "/_osoba/sensio/drive/drive/v3/files/doc1/export") in trojice
@@ -433,3 +472,94 @@ def test_stdio_konec_do_konce(vratny):
     data = r.structuredContent
     assert data["ucet"] == "sensio" and data["obsah"].startswith("⟦nedůvěryhodný obsah – začátek⟧")
     assert all(z["cesta"].startswith("/_osoba/") for z in vratny.zaznamy)
+
+
+
+# --- nalezy revize B (22. 11. 2026) ------------------------------------------
+
+def test_koncept_vic_adresatu_a_skryta_kopie(vratny):
+    with ZakazSite():
+        r = _spust(_app().create_gmail_draft(to='a@example.org, "Novák, Jan" <jn@example.org>', subject="S",
+                                             body="B", cc=["c@example.org"], bcc=["skryta@example.org"]))
+    assert not r.get("error"), r
+    zprava, _ = _mime(json.loads([z for z in vratny.zaznamy if z["metoda"] == "POST"][0]["telo"])["message"]["raw"])
+    assert "a@example.org" in zprava["To"] and "jn@example.org" in zprava["To"]
+    assert zprava["Bcc"] == "skryta@example.org" and zprava["Cc"] == "c@example.org"
+
+
+def test_uprava_konceptu_zachova_vsechny_adresaty(vratny):
+    vratny.koncept_hlavicky = [
+        {"name": "To", "value": "a@example.org, b@example.org"},
+        {"name": "Cc", "value": '"Novak, Jan" <jn@example.org>, c@example.org'},
+        {"name": "Bcc", "value": "skryta@example.org"},
+        {"name": "Subject", "value": "=?utf-8?q?P=C5=99edm=C4=9Bt?="},
+    ]
+    with ZakazSite():
+        r = _spust(_app().gmail_update_draft(draft_id="d1", body="novy"))
+    assert not r.get("error"), r
+    zprava, text = _mime(json.loads([z for z in vratny.zaznamy if z["metoda"] == "PUT"][0]["telo"])["message"]["raw"])
+    assert "a@example.org" in zprava["To"] and "b@example.org" in zprava["To"]
+    assert "jn@example.org" in zprava["Cc"] and "c@example.org" in zprava["Cc"]
+    assert zprava["Bcc"] == "skryta@example.org"
+    assert str(make_header(decode_header(zprava["Subject"]))) == "Předmět"
+    assert text == "novy"
+
+
+def test_uprava_konceptu_s_prilohou_odmitne(vratny):
+    vratny.koncept_prilohy = True
+    with ZakazSite():
+        r = _spust(_app().gmail_update_draft(draft_id="d1", body="novy"))
+    assert r["error"] and r["code"] == "DRAFT_HAS_ATTACHMENTS"
+    assert not any(z["metoda"] == "PUT" for z in vratny.zaznamy)
+
+
+def test_necekana_vyjimka_je_veta(vratny):
+    vratny.rozbita_zprava = True
+    with ZakazSite():
+        r = _spust(_app().gmail_get_message_details(email_id="m1"))
+    assert r["error"] and r["code"] == "TOOL_ERROR" and "KeyError" in r["message"]
+
+
+def test_textovy_soubor_v_cp1250_prijde_jako_base64(vratny):
+    with ZakazSite():
+        r = _spust(_app().drive_read_file_content(file_id="cp1250"))
+    data = json.loads(r["obsah"][len(_app().CIZI_ZACATEK):-len(_app().CIZI_KONEC)])
+    assert data["encoding"] == "base64"
+    assert base64.b64decode(data["content"]).decode("cp1250") == "Příliš;žluťoučký"
+
+
+def test_proxy_z_prostredi_se_nepouzije(vratny, monkeypatch):
+    for k in ("http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY", "all_proxy"):
+        monkeypatch.setenv(k, "http://127.0.0.1:9")
+    monkeypatch.delenv("no_proxy", raising=False)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    with ZakazSite():
+        r = _spust(_app().gmail_get_message_details(email_id="m1"))
+    assert not r.get("error"), r
+
+
+def test_jmeno_uctu_s_koncem_radku_neprojde(vratny):
+    with ZakazSite():
+        r = _spust(_app().query_gmail_emails(query="x", ucet="sensio\n"))
+    assert r["code"] == "UCET_INVALID" and vratny.zaznamy == []
+
+
+def test_chyba_seznamu_pri_vyberu_uctu_je_veta(vratny):
+    vratny.users_id = "43"  # dukaz pracovny 42 vratny (admin) neprijme
+    with ZakazSite():
+        r = _spust(_app().query_gmail_emails(query="x"))
+    assert r["error"] and r["code"] == "PROOF_INVALID" and "klíč pracovny" in r["message"]
+
+
+def test_kalendar_neskryva_ucastniky_z_zadne_domeny(vratny):
+    with ZakazSite():
+        r = _spust(_app().calendar_list_events())
+    data = json.loads(r["obsah"][len(_app().CIZI_ZACATEK):-len(_app().CIZI_KONEC)])
+    assert data["events"][0]["attendees"] == [{"email": "kolega@sensio.cz"}]
+
+
+def test_hledani_posty_ma_strop(vratny):
+    with ZakazSite():
+        _spust(_app().query_gmail_emails(query="x", max_results=500))
+    seznam = [z for z in vratny.zaznamy if z["cesta"].endswith("/users/me/messages")][0]
+    assert seznam["dotaz"]["maxResults"] == ["50"]

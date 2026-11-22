@@ -50,6 +50,14 @@ class FalesnyVratny:
                       "stav": "active"}]
         self.chyby: dict[tuple[str, str], tuple[int, str, dict]] = {}
         self.obsah_zpravy = "Dobry den, posilam podklady."
+        self.koncept_hlavicky = [
+            {"name": "To", "value": "adresat@example.org"},
+            {"name": "Subject", "value": "Re: Podklady"},
+            {"name": "In-Reply-To", "value": "<m1@example.org>"},
+            {"name": "References", "value": "<m1@example.org>"}]
+        self.koncept_prilohy = False
+        self.rozbita_zprava = False
+        self.ucastnik = "kolega@sensio.cz"
         self._srv = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self.url = f"http://127.0.0.1:{self._srv.server_address[1]}/_osoba"
         threading.Thread(target=self._srv.serve_forever, daemon=True).start()
@@ -77,6 +85,8 @@ class FalesnyVratny:
                 return j({"messages": [{"id": "m1", "threadId": "t1"}]})
             if "/attachments/" in t:
                 return j({"data": b64("obsah prilohy"), "size": 13})
+            if t.startswith("messages/") and self.rozbita_zprava:
+                return j({"id": "m1"})
             if t.startswith("messages/"):
                 return j({"id": "m1", "threadId": "t1", "snippet": "s", "labelIds": ["INBOX"],
                           "payload": {"mimeType": "text/plain", "headers": [
@@ -94,13 +104,13 @@ class FalesnyVratny:
             if t.startswith("drafts/"):
                 if metoda == "DELETE":
                     return 204, {}, b""
-                return j({"id": "d1", "message": {"id": "m9", "threadId": "t1", "payload": {
-                    "mimeType": "text/plain", "headers": [
-                        {"name": "To", "value": "adresat@example.org"},
-                        {"name": "Subject", "value": "Re: Podklady"},
-                        {"name": "In-Reply-To", "value": "<m1@example.org>"},
-                        {"name": "References", "value": "<m1@example.org>"}],
-                    "body": {"data": b64("puvodni koncept")}}}})
+                payload = {"mimeType": "text/plain", "headers": self.koncept_hlavicky,
+                           "body": {"data": b64("puvodni koncept")}}
+                if self.koncept_prilohy:
+                    payload = {"mimeType": "multipart/mixed", "headers": self.koncept_hlavicky, "parts": [
+                        {"mimeType": "text/plain", "body": {"data": b64("text")}},
+                        {"mimeType": "application/pdf", "filename": "a.pdf", "body": {"attachmentId": "x"}}]}
+                return j({"id": "d1", "message": {"id": "m9", "threadId": "t1", "payload": payload}})
         if sluzba == "drive":
             t = cesta.split("drive/v3/", 1)[-1]
             if t == "files":
@@ -114,8 +124,10 @@ class FalesnyVratny:
             if t.startswith("files/"):
                 fid = urllib.parse.unquote(t.split("/", 1)[1])
                 if dotaz.get("alt") == ["media"]:
+                    if fid == "cp1250":
+                        return 200, {"Content-Type": "text/csv"}, "Příliš;žluťoučký".encode("cp1250")
                     return 200, {"Content-Type": "text/plain"}, "obsah souboru".encode()
-                mime = "application/vnd.google-apps.document" if fid == "doc1" else "text/plain"
+                mime = {"doc1": "application/vnd.google-apps.document", "cp1250": "text/csv"}.get(fid, "text/plain")
                 return j({"id": fid, "name": "n", "mimeType": mime})
         if sluzba == "calendar":
             t = cesta.split("calendar/v3/", 1)[-1]
@@ -124,7 +136,8 @@ class FalesnyVratny:
             if "/events/" in t:
                 return j({"id": "e1", "summary": "Porada"})
             if t.endswith("/events"):
-                return j({"items": [{"id": "e1", "summary": "Porada", "start": {"dateTime": "2026-11-23T10:00:00Z"},
+                return j({"items": [{"id": "e1", "summary": "Porada", "attendees": [{"email": self.ucastnik}],
+                                     "start": {"dateTime": "2026-11-23T10:00:00Z"},
                                      "end": {"dateTime": "2026-11-23T11:00:00Z"}}]})
         return self._chyba(403, "PATH_NOT_ALLOWED")
 
